@@ -1,7 +1,8 @@
 % Analysis and plotting of multisession table data
 %% Data loading
-clearvars
-%load('')
+if ~exist('resultsTable', 'var')
+    MultiSessionTableGen()
+end
 %% Data proccessiong
 T = resultsTable;
 bf = 500; % boundary frequency
