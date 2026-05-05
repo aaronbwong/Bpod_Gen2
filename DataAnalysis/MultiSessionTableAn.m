@@ -5,12 +5,15 @@ if ~exist('resultsTable', 'var')
 end
 %% Data proccessiong
 T = resultsTable;
+T2 = metaTable;
 bf = 500; % boundary frequency
 amp_to_dis = 50.5; % amp: 0-1 displacement = amp_to_dis * amp
 T.Displacement = T.VibAmp * amp_to_dis;
 
 % convert date string to datetime
 T.DateTime = datetime(resultsTable.Time, ...
+        'InputFormat', 'yyyyMMdd_HHmmss');
+T2.DateTime = datetime(T2.Time, ...
         'InputFormat', 'yyyyMMdd_HHmmss');
 
 % Only keep sessions with >= 40 trials
@@ -156,6 +159,7 @@ for i = 1:nAnimals
     % number the sessions for this animal
     sl.NumSession(animalMask) = (1:sum(animalMask))';
 end
+sl = outerjoin(sl,T2,"Keys",{'AnimalID','DateTime','Protocol'},'Type','left','MergeKeys',true);
 T = sortrows(T,{'AnimalID','DateTime','VibFreq','VibAmp'});
 for i = 1:nAnimals
     animalMask = strcmp(T.AnimalID, animals{i});
@@ -1277,7 +1281,19 @@ legend('show', 'Location', 'best');
 
 % save with legend
 saveFigAsPNG('Stimuli_Displace_ByDay_WithLegend');
-
+%% QuietTime and ITI settings over sessions
+op = {'DateTime'}; % options for plotting
+var2plot = {'MinQuietTime', 'MaxQuietTime'}; % Variables to plot
+plotProgression(sl,op,var2plot);ylim([0,inf]);
+var2plot = {'MinITI', 'MaxITI'}; % Variables to plot
+plotProgression(sl,op,var2plot);ylim([0,inf]);
+var2plot = {'ResWin'}; % Variables to plot
+plotProgression(sl,op,var2plot);ylim([0,inf]);
+%% Plotting response rate using generic "plotProgression" function
+var2plot = {'ResponseRate','FalseAlarmRate'}; % Variables to plot
+plotProgression(sl,op,var2plot);
+var2plot = {'ResponseDPrime'}; % Variables to plot
+plotProgression(sl,op,var2plot);
 %%  "easiest stimuli“(all Freq) Latency plotting
 T_sorted = sortrows(T, {'AnimalID', 'NumSession', 'VibFreq', 'VibAmp'}, {'ascend', 'ascend', 'ascend', 'descend'});
 
@@ -1457,4 +1473,70 @@ function saveFigAsPNG(prefix)
     
     % Display confirmation message
     fprintf('Figure saved as: %s\n', fullPath);
+end
+
+% Generic plot function to plot animal progression
+function plotProgression(sl,x2plot,var2plot)
+animals = unique(sl.AnimalID);
+nAnimals = length(animals);
+LineStyles = {'-',':','--'};
+numVar = length(var2plot);
+for o = 1:length(x2plot)
+    plotBy = x2plot{o}; % 'DateTime'; 'SessionNumber'
+    figure('Position', [100, 100, 1300, 500]);
+    % colors for each animal
+    animalColors  = lines(nAnimals); 
+      
+    for i = 1:nAnimals
+        mask = strcmp(sl.AnimalID, animals{i});
+    
+        % LeftRateHighFreq
+        switch plotBy
+            case 'DateTime'
+                x = sl.DateTime(mask);
+            case 'SessionNumber'
+                x = sl.NumSession(mask);
+            otherwise
+                x = sl.NumSession(mask);
+        end
+        for jVar = 1:numVar
+            varName = var2plot{jVar};
+            y = sl.(varName)(mask);
+            [x_sorted, sort_idx] = sort(x);
+            y_sorted = y(sort_idx);
+
+            plot(x_sorted, y_sorted, 'o', ...
+                 'Color',animalColors(i, :),...
+                 'MarkerSize', 3, ...
+                 'MarkerFaceColor', animalColors(i, :), ...
+                 'LineWidth', 2, ...
+                 'LineStyle', LineStyles{jVar},...
+                 'DisplayName', [char(animals{i}),'(',varName,')']);
+            hold on;
+        end
+    end
+    
+    % xlabel
+    switch plotBy
+        case 'DateTime'
+            xLabel = "Date";
+        case 'SessionNumber'
+            xLabel = "Session Number";    
+        otherwise
+            xLabel = "Session Number";
+    end
+
+    % for i = 1:2
+        % subplot(2, 1, i);
+        xlabel(xLabel, 'FontSize', 14);
+        grid on;
+        legend('Location', 'eastoutside', 'FontSize', 10);
+        if strcmp(plotBy,'DateTime')
+            xticks(min(x_sorted(1)) + caldays(0:7:360));
+            xtickformat('MMM-dd')
+        end
+        hold off;
+    % end
+    
+end
 end

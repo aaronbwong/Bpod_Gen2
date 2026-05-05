@@ -84,25 +84,20 @@ disp(['Selected ' num2str(numFiles) ' file(s) to process']);
 % Initialize table for results 
 numFiles = length(selectedFiles);
 resultsTable = table();
-
+metaTable = table();
 for fileIdx = 1:numFiles
     absolute_path = selectedFiles{fileIdx};
     
     % Get filepath and filename from full path
-    [filepath, filename, ~] = fileparts(absolute_path);
-    filename = [filename, '.mat'];  % Add extension back for display
-    
-    % Get filename without extension
-    [~, name_only, ~] = fileparts(absolute_path);
+    [filepath, name_only, extension] = fileparts(absolute_path);
+    filename = [name_only, extension];  % Add extension back for display
     
     % Display file information
     disp('========================================');
     disp(['Processing file ' num2str(fileIdx) ' of ' num2str(numFiles) ': ' filename]);
     disp(['File path: ' absolute_path]);
     
-    % Load file based on file type
-    [~, ~, extension] = fileparts(filename);
-    
+    % Load file based on file type    
     switch lower(extension)
         case {'.mat'}
             % Load MAT file
@@ -114,12 +109,12 @@ for fileIdx = 1:numFiles
             continue;  % Skip to next file
     end
     
-    % Display file information
-    file_info = dir(absolute_path);
     disp('Behavior Data loaded');
     
-    sessionTable  = analyzeSingleSession(currentSessionData, filename);
+    [sessionTable,sessionMetaTable]  = analyzeSingleSession(currentSessionData, filename);
     resultsTable = [resultsTable; sessionTable];
+    % if strcmp(filename,'Y006_SwitchWhenNCorrect_20260319_155612.mat');keyboard;end
+    metaTable = [metaTable; sessionMetaTable];
     disp('Current Session Analysed successfully');
 end
 %% Store session list and analysis results into a table
@@ -131,7 +126,7 @@ end
 %% Analysis functions
 % Main per-session analysis function.
 % Returns a struct with overall session summary and a per-stimulus table.
-function sessionTable = analyzeSingleSession(currentSessionData, filename)
+function [sessionTable,sessionMetaTable] = analyzeSingleSession(currentSessionData, filename)
     % ---- 1. Extract SessionData from loaded .mat struct ----
     if isstruct(currentSessionData) && isfield(currentSessionData, 'SessionData')
         SessionData = currentSessionData.SessionData;
@@ -161,6 +156,26 @@ function sessionTable = analyzeSingleSession(currentSessionData, filename)
         datetimeStr = '';
     end
 
+    % --- 2.5 trial settings ---
+    GUI_settings = struct2table([SessionData.TrialSettings(:).GUI]);
+    GUI_settings = unique(GUI_settings,'rows');
+    if height(GUI_settings) == 1
+        sessionMetaTable = GUI_settings;
+    else
+        MinITI = min(GUI_settings.MinITI);
+        MaxITI = max(GUI_settings.MaxITI);
+        MinQuietTime = min(GUI_settings.MinQuietTime);
+        MaxQuietTime = max(GUI_settings.MaxQuietTime);
+        RewardAmount = mean(GUI_settings.RewardAmount);
+        ResWin = mean(GUI_settings.ResWin);
+        CutOffPeriod = mean(GUI_settings.CutOffPeriod);
+        sessionMetaTable = table(MinITI,MaxITI,MinQuietTime,MaxQuietTime,RewardAmount,ResWin,CutOffPeriod);
+    end
+    if ~ismember('NCorrectToSwitch',GUI_settings.Properties.VariableNames)
+        sessionMetaTable.NCorrectToSwitch = nan(1);
+    elseif ~ismember('NCorrectToSwitch',sessionMetaTable.Properties.VariableNames)
+        sessionMetaTable.NCorrectToSwitch = mean(GUI_settings.NCorrectToSwitch);
+    end
     % ---- 3. Ensure StimTable exists and matches nTrials ----
     % Extract trial information
     if ~isfield(SessionData, 'StimTable')
@@ -320,6 +335,13 @@ function sessionTable = analyzeSingleSession(currentSessionData, filename)
     sessionTable.Protocol = repmat({protocol}, nCombos, 1);
     sessionTable.Time = repmat({datetimeStr}, nCombos, 1);
     sessionTable.Session_nTrials = repmat(nTrials, nCombos, 1);
+    
+    sessionMetaTable.FileName = {filename};
+    sessionMetaTable.AnimalID = {animalID};
+    sessionMetaTable.Protocol = {protocol};
+    sessionMetaTable.Time = datetimeStr;
+    sessionMetaTable.Session_nTrials = nTrials;
+    sessionMetaTable = movevars(sessionMetaTable, {'FileName','AnimalID','Protocol','Time', 'Session_nTrials'}, 'Before', 1);
 end
 
 % Helper: determine first response side for a trial (1=left, 2=right, NaN=no response)
