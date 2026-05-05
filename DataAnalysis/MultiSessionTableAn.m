@@ -4,171 +4,9 @@ if ~exist('resultsTable', 'var')
     MultiSessionTableGen()
 end
 %% Data proccessiong
-T = resultsTable;
-T2 = metaTable;
-bf = 500; % boundary frequency
-amp_to_dis = 50.5; % amp: 0-1 displacement = amp_to_dis * amp
-T.Displacement = T.VibAmp * amp_to_dis;
-
-% convert date string to datetime
-T.DateTime = datetime(resultsTable.Time, ...
-        'InputFormat', 'yyyyMMdd_HHmmss');
-T2.DateTime = datetime(T2.Time, ...
-        'InputFormat', 'yyyyMMdd_HHmmss');
-
-% Only keep sessions with >= 40 trials
-validRows = T.Session_nTrials >= 40;
-T = T(validRows, :);
-
-% calculation of response rate for each stimulus(including catch trial as false alarm rate)
-n_response = T.N_ValidRT; 
-n_trial = T.NTrials; % NTrials is number of trials for each stimulus/catch trial
-res_rate = n_response ./ n_trial; % response rate for each stimulus/catch trial
-T.ResRate = res_rate;
-
-animals = unique(T.AnimalID);
+[sl,T] = analyseSessionResults(resultsTable,metaTable);
+animals = unique(sl.AnimalID);
 nAnimals = length(animals);
-% sl: session list
-[sl, idx] = unique(T(:, {'AnimalID', 'DateTime'}), 'rows');
-sl.Protocol = T.Protocol(idx);
-
-% remove NaT DateTime
-validRows = ~isnat(sl.DateTime);
-sl = sl(validRows, :);
-validRows = ~isnat(T.DateTime);
-T = T(validRows, :);
-
-% Calculation of ground hit rate, ground response rate and false alarm rate by session per mouse
-nSessions = height(sl);
-falseAlarm = NaN(nSessions, 1);
-resRate = NaN(nSessions, 1);
-resRateEasy = NaN(nSessions, 1);
-resRateEasiest = NaN(nSessions, 1);
-sessionHitRate = NaN(nSessions, 1);
-sessionLeftHitRate = NaN(nSessions, 1);
-sessionRightHitRate = NaN(nSessions, 1);
-leftRateLow = NaN(nSessions, 1);
-leftRateHigh = NaN(nSessions, 1);
-
-
-for i = 1:nSessions
-    animal = sl.AnimalID(i);
-    time = sl.DateTime(i);
-    % false alarm rate
-    rowIdx = find(T.DateTime == time & ...
-              strcmp(T.AnimalID, animal)& ...
-              T.VibFreq == 0);
-    if rowIdx
-        falseAlarm(i) =  T.ResRate(rowIdx);
-    end
-    % response rate
-    rowIdx = find(T.DateTime == time & ...
-              strcmp(T.AnimalID, animal)& ...
-              T.VibFreq ~= 0);
-    if rowIdx
-        notCatchTrials = sum(T.NTrials(rowIdx));
-        notCatchTrialRes = sum(T.N_ValidRT(rowIdx));
-        resRate(i) = notCatchTrialRes / notCatchTrials;
-    end
-    % response rate for "easiest" stimuli(highest amp for each freq)
-    easyTrials =  0;
-    easyTrialsRes = 0;
-    easiestTrials = 0;
-    easiestTrialsRes = 0;
-    iseasiest = false;
-
-    rowIdx = find(T.DateTime == time & ...
-              strcmp(T.AnimalID, animal)& ...
-              T.VibFreq ~= 0);
-    freqs = unique(T.VibFreq(rowIdx));
-    easiestFreq = max(freqs);
-    for f = 1:length(freqs)
-        targetFreq = freqs(f);
-        mask = T.DateTime == time & strcmp(T.AnimalID, animal) & T.VibFreq == targetFreq;
-        if any(mask)
-            maxAmp = max(T.VibAmp(mask));
-            nEasyTrials = T.NTrials(find(T.DateTime == time & ...
-                                        strcmp(T.AnimalID, animal) & ...
-                                        T.VibFreq == targetFreq & ...
-                                        T.VibAmp == maxAmp, 1));
-            nEasyTrialsRes = T.N_ValidRT(find(T.DateTime == time & ...
-                                        strcmp(T.AnimalID, animal) & ...
-                                        T.VibFreq == targetFreq & ...
-                                        T.VibAmp == maxAmp, 1));
-            if targetFreq == easiestFreq
-               resRateEasiest(i)  = nEasyTrialsRes/nEasyTrials;
-            end
-            easyTrials = easyTrials + nEasyTrials;
-            easyTrialsRes = easyTrialsRes + nEasyTrialsRes;
-        end
-    end
-    if easyTrials ~= 0
-        resRateEasy(i) = easyTrialsRes /easyTrials;
-    end
-    easyHighTrials = 0;
-    easyLowTrials = 0;
-
-    rowIdx = find(T.DateTime == time & ...
-              strcmp(T.AnimalID, animal) & ...
-              T.VibFreq ~= 0);
-
-    freqs = unique(T.VibFreq(rowIdx));
-
-    easyHighFreq = max(freqs(freqs > bf));
-    if easyHighFreq
-        idxHigh = T.DateTime == time & ...
-                  strcmp(T.AnimalID, animal) & ...
-                  T.VibFreq == easyHighFreq;
-        easyHighFreqAmp = max(T.VibAmp(idxHigh));
-        
-        [~, maxAmpRowHigh] = max(T.VibAmp(idxHigh));
-        tempHigh = T(idxHigh, :);
-        easyHighRow = tempHigh(maxAmpRowHigh, :);
-        leftRateHigh(i) = easyHighRow.LeftRes / easyHighRow.N_ValidRT;
-    end
-
-    easyLowFreq = min(freqs(freqs < bf));
-    if easyLowFreq
-        idxLow = T.DateTime == time & ...
-                 strcmp(T.AnimalID, animal) & ...
-                 T.VibFreq == easyLowFreq;
-        easyLowFreqAmp = max(T.VibAmp(idxLow));
-        
-        [~, maxAmpRowLow] = max(T.VibAmp(idxLow));
-        tempLow = T(idxLow, :);
-        easyLowRow = tempLow(maxAmpRowLow, :);
-        leftRateLow(i) = easyLowRow.LeftRes / easyLowRow.N_ValidRT;
-    end
-end
-sl.FalseAlarmRate = falseAlarm;
-sl.ResponseRate = resRate;
-sl.ResponseRateEasy = resRateEasy;
-sl.ResponseRateEasiest = resRateEasiest;
-sl.ResponseDPrime =  prob2zscore(resRate) - prob2zscore(falseAlarm);
-sl.ResponseBias =  0.5 * (prob2zscore(resRate) + prob2zscore(falseAlarm));
-sl.ResponseDPrimeEasiset =  prob2zscore(resRateEasiest) - prob2zscore(falseAlarm);
-sl.LeftRateLow = leftRateLow;
-sl.LeftRateHigh = leftRateHigh;
-sl.LeftRateDPrime =  prob2zscore(leftRateHigh) - prob2zscore(leftRateLow);
-sl.LeftBias =  0.5 * (prob2zscore(leftRateHigh) + prob2zscore(leftRateLow));
-
-% sorting and index sessions by time for each mouse 
-sl = sortrows(sl,{'AnimalID','DateTime'});
-for i = 1:nAnimals
-    animalMask = strcmp(sl.AnimalID, animals{i});
-    % number the sessions for this animal
-    sl.NumSession(animalMask) = (1:sum(animalMask))';
-end
-sl = outerjoin(sl,T2,"Keys",{'AnimalID','DateTime','Protocol'},'Type','left','MergeKeys',true);
-T = sortrows(T,{'AnimalID','DateTime','VibFreq','VibAmp'});
-for i = 1:nAnimals
-    animalMask = strcmp(T.AnimalID, animals{i});
-    animalDateTimes = T.DateTime(animalMask);
-    % number the sessions for this animal
-    T.NumSession(animalMask) = (1:sum(animalMask))';
-    [~, ~, idx] = unique(animalDateTimes);
-    T.NumSession(animalMask) = idx;
-end
 %% Plotting
 % % false alarm rate [not used]
 % figure('Position', [100, 100, 1300, 600]);
@@ -1294,6 +1132,24 @@ var2plot = {'ResponseRate','FalseAlarmRate'}; % Variables to plot
 plotProgression(sl,op,var2plot);
 var2plot = {'ResponseDPrime'}; % Variables to plot
 plotProgression(sl,op,var2plot);
+
+%% Complex graph using "addProgression" function
+plotBy = 'DateTime';
+% plotBy = 'NumSession';
+figure('Position',[100,20,1300,800]);
+t = tiledlayout(3,1,'TileSpacing','tight');
+% axis 1
+ax1 = nexttile(t);
+addProtocol(sl,plotBy)
+ax2 = nexttile(t);
+var2plot = {'ResponseRate','FalseAlarmRate'}; % Variables to plot
+addProgression(sl,plotBy,var2plot);
+
+ax3 = nexttile(t);
+var2plot = {'ResponseDPrime'}; % Variables to plot
+addProgression(sl,plotBy,var2plot);
+
+linkaxes([ax1,ax2,ax3],'x')
 %%  "easiest stimuli“(all Freq) Latency plotting
 T_sorted = sortrows(T, {'AnimalID', 'NumSession', 'VibFreq', 'VibAmp'}, {'ascend', 'ascend', 'ascend', 'descend'});
 
@@ -1538,5 +1394,302 @@ for o = 1:length(x2plot)
         hold off;
     % end
     
+end
+end
+
+% Generic plot function to plot animal progression
+function addProgression(sl,plotBy,var2plot)
+animals = unique(sl.AnimalID);
+nAnimals = length(animals);
+LineStyles = {'-',':','--'};
+numVar = length(var2plot);
+
+% colors for each animal
+animalColors  = lines(nAnimals); 
+minDateTime = datetime();
+for i = 1:nAnimals
+    mask = strcmp(sl.AnimalID, animals{i});
+
+    % LeftRateHighFreq
+    switch plotBy
+        case 'DateTime'
+            x = sl.DateTime(mask);
+        case {'SessionNumber', 'NumSession'}
+            x = sl.NumSession(mask);
+        otherwise
+            x = sl.NumSession(mask);
+    end
+    [x_sorted, sort_idx] = sort(x);
+    for jVar = 1:numVar
+        varName = var2plot{jVar};
+        y = sl.(varName)(mask);
+        y_sorted = y(sort_idx);
+
+        plot(x_sorted, y_sorted, 'o', ...
+             'Color',animalColors(i, :),...
+             'MarkerSize', 3, ...
+             'MarkerFaceColor', animalColors(i, :), ...
+             'LineWidth', 2, ...
+             'LineStyle', LineStyles{jVar},...
+             'DisplayName', [char(animals{i}),'(',varName,')']);
+        hold on;
+    end
+    if strcmp(plotBy,'DateTime')
+        minDateTime = min(minDateTime,x_sorted(1));
+    end
+end
+
+% xlabel
+switch plotBy
+    case 'DateTime'
+        xLabel = "Date";
+    case 'SessionNumber'
+        xLabel = "Session Number";    
+    otherwise
+        xLabel = "Session Number";
+end
+
+xlabel(xLabel, 'FontSize', 14);
+grid on;
+legend('Location', 'eastoutside', 'FontSize', 10);
+if strcmp(plotBy,'DateTime')
+    xticks(minDateTime + caldays(0:7:360));
+    xtickformat('MMM-dd')
+end
+hold off;
+    
+end
+
+% plot stages
+function addProtocol(sl,plotBy)
+animals = unique(sl.AnimalID);
+nAnimals = length(animals);
+
+% colors for each protocol
+% animalColors  = lines(nAnimals); 
+minDateTime = datetime();
+protocols = unique(sl.Protocol);
+nProtocols = length(protocols);
+protocolColors = lines;
+
+for i = 1:nAnimals
+    mask = strcmp(sl.AnimalID, animals{i});
+
+    % LeftRateHighFreq
+    switch plotBy
+        case 'DateTime'
+            x = sl.DateTime(mask);
+        case {'SessionNumber', 'NumSession'}
+            x = sl.NumSession(mask);
+        otherwise
+            x = sl.NumSession(mask);
+    end
+    [x_sorted, sort_idx] = sort(x);
+    p = sl.Protocol(mask);
+    c = nan(length(p),3);
+    for jProt = 1:nProtocols
+        idx = strcmp(p,protocols{jProt});
+        c(idx,:) = repmat(protocolColors(jProt,:),sum(idx),1);
+    end
+    c_sorted = c(sort_idx,:);
+    % p_sorted = p(sort_idx);
+    y_sorted = repmat(i,size(x_sorted));
+    scatter(x_sorted,  y_sorted, 25, c_sorted,'filled',...
+         'Marker', 's');
+    hold on;
+    if strcmp(plotBy,'DateTime')
+        minDateTime = min(minDateTime,x_sorted(1));
+    end
+end
+% xlabel
+switch plotBy
+    case 'DateTime'
+        xLabel = "Date";
+    case 'SessionNumber'
+        xLabel = "Session Number";    
+    otherwise
+        xLabel = "Session Number";
+end
+
+xlabel(xLabel, 'FontSize', 14);
+grid on;
+% legend('Location', 'eastoutside', 'FontSize', 10);
+if strcmp(plotBy,'DateTime')
+    xticks(minDateTime + caldays(0:7:360));
+    xtickformat('MMM-dd')
+end
+
+yticks(1:nAnimals)
+yticklabels(animals)
+ylim([0.5,nAnimals+0.5])
+hold off;
+
+end
+% FACTORIZED ANALYSIS FUNCTION
+function [sl,T] = analyseSessionResults(resultsTable,metaTable)
+T = resultsTable;
+T2 = metaTable;
+bf = 500; % boundary frequency
+amp_to_dis = 50.5; % amp: 0-1 displacement = amp_to_dis * amp
+T.Displacement = T.VibAmp * amp_to_dis;
+
+% convert date string to datetime
+T.DateTime = datetime(resultsTable.Time, ...
+    'InputFormat', 'yyyyMMdd_HHmmss');
+T2.DateTime = datetime(T2.Time, ...
+    'InputFormat', 'yyyyMMdd_HHmmss');
+
+% Only keep sessions with >= 40 trials
+validRows = T.Session_nTrials >= 40;
+T = T(validRows, :);
+
+% calculation of response rate for each stimulus(including catch trial as false alarm rate)
+n_response = T.N_ValidRT; 
+n_trial = T.NTrials; % NTrials is number of trials for each stimulus/catch trial
+res_rate = n_response ./ n_trial; % response rate for each stimulus/catch trial
+T.ResRate = res_rate;
+
+animals = unique(T.AnimalID);
+nAnimals = length(animals);
+% sl: session list
+[sl, idx] = unique(T(:, {'AnimalID', 'DateTime'}), 'rows');
+sl.Protocol = T.Protocol(idx);
+
+% remove NaT DateTime
+validRows = ~isnat(sl.DateTime);
+sl = sl(validRows, :);
+validRows = ~isnat(T.DateTime);
+T = T(validRows, :);
+
+% Calculation of ground hit rate, ground response rate and false alarm rate by session per mouse
+nSessions = height(sl);
+falseAlarm = NaN(nSessions, 1);
+resRate = NaN(nSessions, 1);
+resRateEasy = NaN(nSessions, 1);
+resRateEasiest = NaN(nSessions, 1);
+sessionHitRate = NaN(nSessions, 1);
+sessionLeftHitRate = NaN(nSessions, 1);
+sessionRightHitRate = NaN(nSessions, 1);
+leftRateLow = NaN(nSessions, 1);
+leftRateHigh = NaN(nSessions, 1);
+
+
+for i = 1:nSessions
+    animal = sl.AnimalID(i);
+    time = sl.DateTime(i);
+    % false alarm rate
+    rowIdx = find(T.DateTime == time & ...
+        strcmp(T.AnimalID, animal)& ...
+        T.VibFreq == 0);
+    if rowIdx
+        falseAlarm(i) =  T.ResRate(rowIdx);
+    end
+    % response rate
+    rowIdx = find(T.DateTime == time & ...
+        strcmp(T.AnimalID, animal)& ...
+        T.VibFreq ~= 0);
+    if rowIdx
+        notCatchTrials = sum(T.NTrials(rowIdx));
+        notCatchTrialRes = sum(T.N_ValidRT(rowIdx));
+        resRate(i) = notCatchTrialRes / notCatchTrials;
+    end
+    % response rate for "easiest" stimuli(highest amp for each freq)
+    easyTrials =  0;
+    easyTrialsRes = 0;
+    easiestTrials = 0;
+    easiestTrialsRes = 0;
+    iseasiest = false;
+
+    rowIdx = find(T.DateTime == time & ...
+        strcmp(T.AnimalID, animal)& ...
+        T.VibFreq ~= 0);
+    freqs = unique(T.VibFreq(rowIdx));
+    easiestFreq = max(freqs);
+    for f = 1:length(freqs)
+        targetFreq = freqs(f);
+        mask = T.DateTime == time & strcmp(T.AnimalID, animal) & T.VibFreq == targetFreq;
+        if any(mask)
+            maxAmp = max(T.VibAmp(mask));
+            nEasyTrials = T.NTrials(find(T.DateTime == time & ...
+                strcmp(T.AnimalID, animal) & ...
+                T.VibFreq == targetFreq & ...
+                T.VibAmp == maxAmp, 1));
+            nEasyTrialsRes = T.N_ValidRT(find(T.DateTime == time & ...
+                strcmp(T.AnimalID, animal) & ...
+                T.VibFreq == targetFreq & ...
+                T.VibAmp == maxAmp, 1));
+            if targetFreq == easiestFreq
+                resRateEasiest(i)  = nEasyTrialsRes/nEasyTrials;
+            end
+            easyTrials = easyTrials + nEasyTrials;
+            easyTrialsRes = easyTrialsRes + nEasyTrialsRes;
+        end
+    end
+    if easyTrials ~= 0
+        resRateEasy(i) = easyTrialsRes /easyTrials;
+    end
+    easyHighTrials = 0;
+    easyLowTrials = 0;
+
+    rowIdx = find(T.DateTime == time & ...
+        strcmp(T.AnimalID, animal) & ...
+        T.VibFreq ~= 0);
+
+    freqs = unique(T.VibFreq(rowIdx));
+
+    easyHighFreq = max(freqs(freqs > bf));
+    if easyHighFreq
+        idxHigh = T.DateTime == time & ...
+            strcmp(T.AnimalID, animal) & ...
+            T.VibFreq == easyHighFreq;
+        easyHighFreqAmp = max(T.VibAmp(idxHigh));
+
+        [~, maxAmpRowHigh] = max(T.VibAmp(idxHigh));
+        tempHigh = T(idxHigh, :);
+        easyHighRow = tempHigh(maxAmpRowHigh, :);
+        leftRateHigh(i) = easyHighRow.LeftRes / easyHighRow.N_ValidRT;
+    end
+
+    easyLowFreq = min(freqs(freqs < bf));
+    if easyLowFreq
+        idxLow = T.DateTime == time & ...
+            strcmp(T.AnimalID, animal) & ...
+            T.VibFreq == easyLowFreq;
+        easyLowFreqAmp = max(T.VibAmp(idxLow));
+
+        [~, maxAmpRowLow] = max(T.VibAmp(idxLow));
+        tempLow = T(idxLow, :);
+        easyLowRow = tempLow(maxAmpRowLow, :);
+        leftRateLow(i) = easyLowRow.LeftRes / easyLowRow.N_ValidRT;
+    end
+end
+sl.FalseAlarmRate = falseAlarm;
+sl.ResponseRate = resRate;
+sl.ResponseRateEasy = resRateEasy;
+sl.ResponseRateEasiest = resRateEasiest;
+sl.ResponseDPrime =  prob2zscore(resRate) - prob2zscore(falseAlarm);
+sl.ResponseBias =  0.5 * (prob2zscore(resRate) + prob2zscore(falseAlarm));
+sl.ResponseDPrimeEasiset =  prob2zscore(resRateEasiest) - prob2zscore(falseAlarm);
+sl.LeftRateLow = leftRateLow;
+sl.LeftRateHigh = leftRateHigh;
+sl.LeftRateDPrime =  prob2zscore(leftRateHigh) - prob2zscore(leftRateLow);
+sl.LeftBias =  0.5 * (prob2zscore(leftRateHigh) + prob2zscore(leftRateLow));
+
+% sorting and index sessions by time for each mouse 
+sl = sortrows(sl,{'AnimalID','DateTime'});
+for i = 1:nAnimals
+    animalMask = strcmp(sl.AnimalID, animals{i});
+    % number the sessions for this animal
+    sl.NumSession(animalMask) = (1:sum(animalMask))';
+end
+sl = outerjoin(sl,T2,"Keys",{'AnimalID','DateTime','Protocol'},'Type','left','MergeKeys',true);
+T = sortrows(T,{'AnimalID','DateTime','VibFreq','VibAmp'});
+for i = 1:nAnimals
+    animalMask = strcmp(T.AnimalID, animals{i});
+    animalDateTimes = T.DateTime(animalMask);
+    % number the sessions for this animal
+    T.NumSession(animalMask) = (1:sum(animalMask))';
+    [~, ~, idx] = unique(animalDateTimes);
+    T.NumSession(animalMask) = idx;
 end
 end

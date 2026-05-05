@@ -113,7 +113,6 @@ for fileIdx = 1:numFiles
     
     [sessionTable,sessionMetaTable]  = analyzeSingleSession(currentSessionData, filename);
     resultsTable = [resultsTable; sessionTable];
-    % if strcmp(filename,'Y006_SwitchWhenNCorrect_20260319_155612.mat');keyboard;end
     metaTable = [metaTable; sessionMetaTable];
     disp('Current Session Analysed successfully');
 end
