@@ -22,11 +22,29 @@ fprintf('You can select multiple files at once (hold Ctrl/Cmd to select multiple
 
 fileCount = 0;
 while true
-    % Select files (supports multiple selection)
-    [filename, filepath, ~] = uigetfile('*.mat', ...
-        sprintf('Select file(s) (Cancel to finish) - Currently %d file(s) selected', fileCount), ...
-        currentPath, ...
-        'MultiSelect', 'on');
+    % Ask whether to select files or a folder
+    selectionType = questdlg('Choose selection type', 'Select Files or Folder', 'Files', 'Folder', 'Files');
+    if isempty(selectionType)
+        selectionType = 'Files';
+    end
+
+    if strcmp(selectionType, 'Files')
+        % Select files (supports multiple selection)
+        [filename, filepath, ~] = uigetfile('*.mat', ...
+            sprintf('Select file(s) (Cancel to finish) - Currently %d file(s) selected', fileCount), ...
+            currentPath, ...
+            'MultiSelect', 'on');
+    else
+        % Select a folder (single). uigetdir does not support multi-select, but
+        % loop allows adding multiple folders sequentially.
+        folderpath = uigetdir(currentPath, sprintf('Select folder (Cancel to finish) - Currently %d file(s) selected', fileCount));
+        if isequal(folderpath, 0)
+            filename = 0; filepath = 0; % mimic cancel
+        else
+            % Mark with special flag so we handle folder below
+            filename = {'__FOLDER__'}; filepath = folderpath;
+        end
+    end
     
     % Check if user canceled
     if isequal(filename, 0) || isequal(filepath, 0)
@@ -39,21 +57,38 @@ while true
         end
     end
     
-    % Handle both single file (string) and multiple files (cell array)
-    if ischar(filename)
-        % Single file selected - convert to cell array for uniform processing
-        filenames = {filename};
+    % Handle folder selection flag
+    if iscell(filename) && isequal(filename, {'__FOLDER__'})
+        % Add all .mat files in the selected folder (no recursion)
+        matListing = dir(fullfile(filepath, '*.mat'));
+        if isempty(matListing)
+            fprintf('No .mat files found in folder: %s\n', filepath);
+        else
+            for k = 1:length(matListing)
+                fileCount = fileCount + 1;
+                fullPath = fullfile(filepath, matListing(k).name);
+                selectedFiles{fileCount} = fullPath;
+                fprintf('File %d: %s\n', fileCount, fullPath);
+            end
+        end
+        filenames = {fullPath}; % for messaging below
     else
-        % Multiple files selected - filename is already a cell array
-        filenames = filename;
-    end
-    
-    % Add all selected files to list
-    for i = 1:length(filenames)
-        fileCount = fileCount + 1;
-        fullPath = fullfile(filepath, filenames{i});
-        selectedFiles{fileCount} = fullPath;
-        fprintf('File %d: %s\n', fileCount, fullPath);
+        % Handle both single file (string) and multiple files (cell array)
+        if ischar(filename)
+            % Single file selected - convert to cell array for uniform processing
+            filenames = {filename};
+        else
+            % Multiple files selected - filename is already a cell array
+            filenames = filename;
+        end
+
+        % Add all selected files to list
+        for i = 1:length(filenames)
+            fileCount = fileCount + 1;
+            fullPath = fullfile(filepath, filenames{i});
+            selectedFiles{fileCount} = fullPath;
+            fprintf('File %d: %s\n', fileCount, fullPath);
+        end
     end
     currentPath = filepath; % Remember last directory for next selection
     
@@ -79,7 +114,12 @@ end
 % Get number of files
 numFiles = length(selectedFiles);
 disp(['Selected ' num2str(numFiles) ' file(s) to process']);
-
+%%
+% folder_path = ''; folder containing .mat files from Bpod
+% listing=dir(fullfile(folder_path,"*.mat"));
+% file_name_format = '(?<mouse>[^_]+)_(?<protocol>[^_]+)_(?<datetime>[\d]{8}_[\d]{6}).mat';
+% out1=regexp({listing.name},file_name_format,'names');
+% session_list_tbl = struct2table([out1{:}]);
 %% Analysis of each session 
 % Initialize table for results 
 numFiles = length(selectedFiles);
