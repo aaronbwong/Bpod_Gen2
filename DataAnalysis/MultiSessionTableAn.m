@@ -8,6 +8,74 @@ end
 animals = unique(sl.AnimalID);
 nAnimals = length(animals);
 %% Plotting
+%% Progression of Response/False Alarm
+plotBy = 'DateTime';
+% plotBy = 'NumSession';
+% plotBy = 'DateReStart';
+figure('Position',[100,20,1300,800]);
+t = tiledlayout(3,1,'TileSpacing','tight');
+% axis 1
+ax1 = nexttile(t);
+addProtocol(sl,plotBy)
+ax2 = nexttile(t);
+var2plot = {'ResponseRate','FalseAlarmRate'}; % Variables to plot
+addProgression(sl,plotBy,var2plot);
+
+ax3 = nexttile(t);
+var2plot = {'ResponseDPrime'}; % Variables to plot
+addProgression(sl,plotBy,var2plot);
+yline(0,'k-','HandleVisibility','off');
+linkaxes([ax1,ax2,ax3],'x')
+%% Progression of left/right discrimination
+plotBy = 'DateTime';
+% plotBy = 'NumSession';
+% plotBy = 'DateReStart';
+figure('Position',[100,20,1300,800]);
+t = tiledlayout(3,1,'TileSpacing','tight');
+% axis 1
+ax1 = nexttile(t);
+addProtocol(sl,plotBy)
+ax2 = nexttile(t);
+var2plot = {'LeftRateHigh','LeftRateLow'}; % Variables to plot
+addProgression(sl,plotBy,var2plot);
+ylabel('Left Rate')
+
+ax3 = nexttile(t);
+var2plot = {'LeftRateDPrime'}; % Variables to plot
+addProgression(sl,plotBy,var2plot);
+yline(0,'k-','HandleVisibility','off');
+linkaxes([ax1,ax2,ax3],'x')
+%% Check configurations
+plotBy = 'NumSession';
+plotBy = 'DateReStart';
+figure('Position',[100,20,1300,800]);
+t = tiledlayout(4,1,'TileSpacing','tight');
+% axis 1
+ax1 = nexttile(t);
+addProtocol(sl,plotBy)
+
+% axis 2
+ax2 = nexttile(t);
+var2plot = {'ResWin'}; % Variables to plot
+addProgression(sl,plotBy,var2plot);
+ylim([0,inf]);
+
+% axis 3
+ax3 = nexttile(t);
+var2plot = {'MaxITI','MinITI'}; % Variables to plot
+addProgression(sl,plotBy,var2plot);
+ylim([0,inf]);
+ylabel('ITI range (s)')
+
+% axis 4
+ax4 = nexttile(t);
+var2plot = {'MaxQuietTime','MinQuietTime'}; % Variables to plot
+addProgression(sl,plotBy,var2plot);
+ylim([0,inf]);
+ylabel('No-lick period range (s)')
+
+linkaxes([ax1,ax2,ax3,ax4],'x')
+%%
 % % false alarm rate [not used]
 % figure('Position', [100, 100, 1300, 600]);
 % % colors for each animal
@@ -1133,23 +1201,7 @@ plotProgression(sl,op,var2plot);
 var2plot = {'ResponseDPrime'}; % Variables to plot
 plotProgression(sl,op,var2plot);
 
-%% Complex graph using "addProgression" function
-plotBy = 'DateTime';
-% plotBy = 'NumSession';
-figure('Position',[100,20,1300,800]);
-t = tiledlayout(3,1,'TileSpacing','tight');
-% axis 1
-ax1 = nexttile(t);
-addProtocol(sl,plotBy)
-ax2 = nexttile(t);
-var2plot = {'ResponseRate','FalseAlarmRate'}; % Variables to plot
-addProgression(sl,plotBy,var2plot);
 
-ax3 = nexttile(t);
-var2plot = {'ResponseDPrime'}; % Variables to plot
-addProgression(sl,plotBy,var2plot);
-
-linkaxes([ax1,ax2,ax3],'x')
 %%  "easiest stimuli“(all Freq) Latency plotting
 T_sorted = sortrows(T, {'AnimalID', 'NumSession', 'VibFreq', 'VibAmp'}, {'ascend', 'ascend', 'ascend', 'descend'});
 
@@ -1416,6 +1468,10 @@ for i = 1:nAnimals
             x = sl.DateTime(mask);
         case {'SessionNumber', 'NumSession'}
             x = sl.NumSession(mask);
+        case 'DateReStart'
+            x = sl.DateTime(mask);
+            x = x - min(x);
+            x = double(x / days(1));
         otherwise
             x = sl.NumSession(mask);
     end
@@ -1444,7 +1500,9 @@ switch plotBy
     case 'DateTime'
         xLabel = "Date";
     case 'SessionNumber'
-        xLabel = "Session Number";    
+        xLabel = "Session Number";  
+    case 'DateReStart'
+        xLabel = "Date re. Start";  
     otherwise
         xLabel = "Session Number";
 end
@@ -1455,6 +1513,14 @@ legend('Location', 'eastoutside', 'FontSize', 10);
 if strcmp(plotBy,'DateTime')
     xticks(minDateTime + caldays(0:7:360));
     xtickformat('MMM-dd')
+end
+if strcmp(plotBy,'DateReStart')
+    xticks(0:7:365);
+end
+
+% ylabel
+if numVar == 1
+    ylabel(var2plot{1});
 end
 hold off;
     
@@ -1481,6 +1547,10 @@ for i = 1:nAnimals
             x = sl.DateTime(mask);
         case {'SessionNumber', 'NumSession'}
             x = sl.NumSession(mask);
+        case 'DateReStart'
+            x = sl.DateTime(mask);
+            x = x - min(x);
+            x = double(x / days(1));
         otherwise
             x = sl.NumSession(mask);
     end
@@ -1506,7 +1576,9 @@ switch plotBy
     case 'DateTime'
         xLabel = "Date";
     case 'SessionNumber'
-        xLabel = "Session Number";    
+        xLabel = "Session Number";  
+    case 'DateReStart'
+        xLabel = "Date re. Start";  
     otherwise
         xLabel = "Session Number";
 end
@@ -1518,10 +1590,33 @@ if strcmp(plotBy,'DateTime')
     xticks(minDateTime + caldays(0:7:360));
     xtickformat('MMM-dd')
 end
-
+if strcmp(plotBy,'DateReStart')
+    xticks(0:7:365);
+end
 yticks(1:nAnimals)
 yticklabels(animals)
 ylim([0.5,nAnimals+0.5])
+
+% Create text annotations for each protocol with color using TeX RGB syntax
+legendText = '';
+for iProt = 1:nProtocols
+    if iProt > 1
+        legendText = [legendText, newline];
+    end
+    rgb = protocolColors(iProt, :);
+    legendText = [legendText, sprintf('\\color[rgb]{%.1f, %.1f, %.1f}%s', rgb(1), rgb(2), rgb(3), protocols{iProt})];
+end
+
+text(1.01, 0.95, legendText, ...
+    'Units', 'normalized', ...
+    'FontSize', 10, ...
+    'FontWeight', 'bold', ...
+    'VerticalAlignment', 'top', ...
+    'BackgroundColor', 'white', ...
+    'EdgeColor', 'k', ...
+    'Margin', 2, ...
+    'Interpreter', 'tex');
+
 hold off;
 
 end
