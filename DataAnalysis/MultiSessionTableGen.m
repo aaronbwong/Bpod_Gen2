@@ -116,11 +116,8 @@ for fileIdx = 1:numFiles
     metaTable = [metaTable; sessionMetaTable];
     disp('Current Session Analysed successfully');
 end
-%% Store session list and analysis results into a table
-% store as csv
-
-% Store as table in .mat
-
+%% Keep only output variables
+clearvars('-except','metaTable','resultsTable')
 
 %% Analysis functions
 % Main per-session analysis function.
