@@ -8,6 +8,8 @@ end
 animals = unique(sl.AnimalID);
 nAnimals = length(animals);
 %% Plotting
+%
+multi_session.plotLatestResponseByAnimal(T);
 %% Progression of Response/False Alarm
 plotBy = 'DateTime';
 % plotBy = 'NumSession';
