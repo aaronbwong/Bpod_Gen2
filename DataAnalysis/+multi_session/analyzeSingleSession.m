@@ -141,4 +141,10 @@ sessionMetaTable.Protocol = {protocol};
 sessionMetaTable.Time = datetimeStr;
 sessionMetaTable.Session_nTrials = nTrials;
 sessionMetaTable = movevars(sessionMetaTable, {'FileName','AnimalID','Protocol','Time','Session_nTrials'}, 'Before', 1);
+
+
+sessionTable.DateTime = datetime(sessionTable.Time, ...
+    'InputFormat', 'yyyyMMdd_HHmmss');
+sessionMetaTable.DateTime = datetime(sessionMetaTable.Time, ...
+    'InputFormat', 'yyyyMMdd_HHmmss');
 end
