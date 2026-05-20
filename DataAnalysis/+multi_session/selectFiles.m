@@ -48,7 +48,7 @@ while true
             for k = 1:numSelected
                 fprintf('File %d: %s\n', fileCount - numSelected + k, newFiles{k});
             end
-            currentPath = filepath;
+            currentPath = fileparts(filepath); % Update to parent directory for next selection
 
         case 'Folder'
             folderpath = uigetdir(currentPath, sprintf('Select folder (Cancel to finish) - Currently %d file(s) selected', fileCount));
@@ -67,7 +67,7 @@ while true
                     fprintf('File %d: %s\n', fileCount - numSelected + k, folderFiles{k});
                 end
             end
-            currentPath = folderpath;
+            currentPath = fileparts(folderpath); % Update to parent directory for next selection
 
         case 'Subjects'
             rootFolder = uigetdir(currentPath, sprintf('Select root folder for subject folders - Currently %d file(s) selected', fileCount));
