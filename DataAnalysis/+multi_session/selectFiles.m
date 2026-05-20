@@ -20,7 +20,7 @@ fprintf('=== File Selection ===\n');
 fprintf('You can select multiple files at once (hold Ctrl/Cmd to select multiple)\n');
 
 while true
-    selectionType = questdlg('Choose selection type', 'Select Files or Folder', 'Files', 'Folder', 'Files');
+    selectionType = questdlg('Choose selection type', 'Select Files, Folder, or Subjects','Subjects', 'Files', 'Folder', 'Subjects');
     if isempty(selectionType)
         selectionType = 'Files';
     end
@@ -67,11 +67,32 @@ while true
                     fprintf('File %d: %s\n', fileCount - numSelected + k, folderFiles{k});
                 end
             end
-                currentPath = folderpath;
+            currentPath = folderpath;
+
+        case 'Subjects'
+            rootFolder = uigetdir(currentPath, sprintf('Select root folder for subject folders - Currently %d file(s) selected', fileCount));
+            if isequal(rootFolder, 0)
+                break;
+            end
+            subjectFiles = multi_session.selectSubjectFolders(rootFolder);
+            if isempty(subjectFiles)
+                fprintf('No subject files were selected from: %s\n', rootFolder);
+                numSelected = 0;
+            else
+                selectedFiles = [selectedFiles; subjectFiles(:)]; %#ok<AGROW>
+                numSelected = numel(subjectFiles);
+                fileCount = fileCount + numSelected;
+                for k = 1:numSelected
+                    fprintf('File %d: %s\n', fileCount - numSelected + k, subjectFiles{k});
+                end
+            end
+            currentPath = rootFolder;
     end
 
     if fileCount == 0
         choice = questdlg('No files selected yet. Do you want to continue selecting?', 'File Selection', 'Yes', 'No', 'Yes');
+    elseif strcmp(selectionType, 'Subjects')
+        break; % After selecting subjects, we assume the user is done and exit the loop
     else
         choice = questdlg(sprintf('%d files selected (total: %d)\n\nDo you want to select more files?', numSelected, fileCount), ...
             'File Selection', 'Yes', 'No', 'Yes');
