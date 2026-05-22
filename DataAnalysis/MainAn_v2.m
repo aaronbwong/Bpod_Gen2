@@ -1,20 +1,20 @@
 %% 1. load behavioural data from multiple files
 clearvars
-
-% use current directory
-defaultDataPath = pwd;
-% Alternative: Set default path for file selection dialog
-%defaultDataPath = '';  % Change this to default path
-
+try
+    load('DEFAULT_FILE_PATHS.mat','DEFAULT_DATA_FOLDER')
+catch
+    warning('No default file path file. Using current directory instead.');
+    DEFAULT_DATA_FOLDER = pwd;
+end
 % Check if default path exists, if not use current directory
-if ~exist(defaultDataPath, 'dir')
-    warning(['Default path does not exist: ' defaultDataPath '. Using current directory instead.']);
-    defaultDataPath = pwd;
+if ~exist(DEFAULT_DATA_FOLDER, 'dir')
+    warning(['Default path does not exist: ' DEFAULT_DATA_FOLDER '. Using current directory instead.']);
+    DEFAULT_DATA_FOLDER = pwd;
 end
 
 % Initialize file list
 selectedFiles = {};
-currentPath = defaultDataPath;
+currentPath = DEFAULT_DATA_FOLDER;
 
 % Loop to select multiple files from different directories
 fprintf('=== File Selection ===\n');
