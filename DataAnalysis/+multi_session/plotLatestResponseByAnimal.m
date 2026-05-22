@@ -92,12 +92,12 @@ if doPlot
             if animalTable.VibFreq(j) == 0
                 xticklabels{j} = 'catch';
             else
-                xticklabels{j} = sprintf('%gHz\\newline%.3g', animalTable.VibFreq(j), animalTable.VibAmp(j));
+                xticklabels{j} = sprintf('%gHz @ %.3g', animalTable.VibFreq(j), animalTable.VibAmp(j));
             end
         end
         ax.XTick = x;
         ax.XTickLabel = xticklabels;
-        ax.XTickLabelRotation = 0;
+        ax.XTickLabelRotation = 45;
         ax.TickLabelInterpreter = 'tex';
         ylabel('Response fraction');
         ylim([0 1]);
