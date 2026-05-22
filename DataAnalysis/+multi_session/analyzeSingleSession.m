@@ -86,6 +86,9 @@ nCombos = size(uniqueCombos, 1);
 
 condCounts = zeros(nCombos, 3);
 allRTsByCondition = cell(nCombos, 1);
+allRTsLeftByCondition = cell(nCombos, 1);
+allRTsRightByCondition = cell(nCombos, 1);
+allRTsCatchByCondition = cell(nCombos, 1);
 for t = 1:nTrials
     curFreq = vibFreqs(t);
     curAmp = vibAmps(t);
@@ -105,6 +108,13 @@ for t = 1:nTrials
     end
     if ~isnan(response_latency)
         allRTsByCondition{idx} = [allRTsByCondition{idx}, response_latency]; %#ok<AGROW>
+        if curFreq == 0
+            allRTsCatchByCondition{idx} = [allRTsCatchByCondition{idx}, response_latency]; %#ok<AGROW>
+        elseif firstSide == 1
+            allRTsLeftByCondition{idx} = [allRTsLeftByCondition{idx}, response_latency]; %#ok<AGROW>
+        elseif firstSide == 2
+            allRTsRightByCondition{idx} = [allRTsRightByCondition{idx}, response_latency]; %#ok<AGROW>
+        end
     end
 end
 
@@ -116,6 +126,9 @@ sessionTable.LeftRes = zeros(nCombos, 1);
 sessionTable.RightRes = zeros(nCombos, 1);
 sessionTable.RT_Median = nan(nCombos, 1);
 sessionTable.N_ValidRT = zeros(nCombos, 1);
+sessionTable.ResponseLatenciesLeft = cell(nCombos, 1);
+sessionTable.ResponseLatenciesRight = cell(nCombos, 1);
+sessionTable.ResponseLatenciesCatch = cell(nCombos, 1);
 for i = 1:nCombos
     sessionTable.VibFreq(i) = uniqueCombos(i, 1);
     sessionTable.VibAmp(i) = uniqueCombos(i, 2);
@@ -127,6 +140,9 @@ for i = 1:nCombos
     if ~isempty(validRTs)
         sessionTable.RT_Median(i) = median(validRTs);
     end
+    sessionTable.ResponseLatenciesLeft{i} = allRTsLeftByCondition{i};
+    sessionTable.ResponseLatenciesRight{i} = allRTsRightByCondition{i};
+    sessionTable.ResponseLatenciesCatch{i} = allRTsCatchByCondition{i};
 end
 
 sessionTable.FileName = repmat({filename}, nCombos, 1);
@@ -134,6 +150,7 @@ sessionTable.AnimalID = repmat({animalID}, nCombos, 1);
 sessionTable.Protocol = repmat({protocol}, nCombos, 1);
 sessionTable.Time = repmat({datetimeStr}, nCombos, 1);
 sessionTable.Session_nTrials = repmat(nTrials, nCombos, 1);
+sessionTable.ResWin = repmat(sessionMetaTable.ResWin, nCombos, 1);
 
 sessionMetaTable.FileName = {filename};
 sessionMetaTable.AnimalID = {animalID};

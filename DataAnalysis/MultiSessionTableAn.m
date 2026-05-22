@@ -8,8 +8,10 @@ end
 animals = unique(sl.AnimalID);
 nAnimals = length(animals);
 %% Plotting
-%
+% Hit Rate Barplots by animal
 multi_session.plotLatestResponseByAnimal(T);
+% Response latency CDF by animal
+multi_session.plotResponseLatencyCDFByAnimal(T);
 %% Progression of Response/False Alarm
 plotBy = 'DateTime';
 % plotBy = 'NumSession';
