@@ -12,6 +12,8 @@ nAnimals = length(animals);
 multi_session.plotLatestResponseByAnimal(T);
 % Response latency CDF by animal
 multi_session.plotResponseLatencyCDFByAnimal(T);
+% Most recent session lick interval histograms by animal
+multi_session.plotLickIntervalsByAnimal(T);
 %% Progression of Response/False Alarm
 plotBy = 'DateTime';
 % plotBy = 'NumSession';

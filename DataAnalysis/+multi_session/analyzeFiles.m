@@ -49,6 +49,10 @@ for fileIdx = 1:numel(selectedFiles)
 
     try
         [sessionTable, sessionMetaTable] = multi_session.analyzeSingleSession(currentSessionData, filename);
+        sessionTable.FilePath = repmat({absolutePath}, height(sessionTable), 1);
+        sessionTable = movevars(sessionTable, 'FilePath', 'Before', 'FileName');
+        sessionMetaTable.FilePath = {absolutePath};
+        sessionMetaTable = movevars(sessionMetaTable, 'FilePath', 'Before', 'FileName');
         resultsTable = [resultsTable; sessionTable]; %#ok<AGROW>
         metaTable = [metaTable; sessionMetaTable]; %#ok<AGROW>
         fprintf('Current session analysed successfully\n');
