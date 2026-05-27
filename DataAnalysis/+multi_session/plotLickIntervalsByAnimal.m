@@ -1,93 +1,136 @@
-function summaryTable = plotLickIntervalsByAnimal(T, varargin)
-%plotLickIntervalsByAnimal Plot lick interval histograms for the latest session of each animal.
-%   summaryTable = multi_session.plotLickIntervalsByAnimal(T)
+function summaryTable = plotLickIntervalsByAnimal(sl, varargin)
+%plotLickIntervalsByAnimal Plot lick interval histograms for selected session(s) of each animal.
+%   summaryTable = multi_session.plotLickIntervalsByAnimal(sl)
 %   uses the most recent valid session for each AnimalID and loads raw
-%   SessionData from the file path stored in T.FilePath.
+%   SessionData from the file path stored in sl.FilePath.
 %
-%   summaryTable = multi_session.plotLickIntervalsByAnimal(T, 'MaxX', 5, 'BinWidth', 0.1)
+%   summaryTable = multi_session.plotLickIntervalsByAnimal(sl, 'MaxX', 5, 'BinWidth', 0.1)
 %   customizes the histogram x-range and bin width.
 %
-%   summaryTable = multi_session.plotLickIntervalsByAnimal(T, 'Plot', false)
+%   summaryTable = multi_session.plotLickIntervalsByAnimal(sl, 'SessionNumber', 2)
+%   plots the second-most recent session per animal.
+%
+%   summaryTable = multi_session.plotLickIntervalsByAnimal(sl, 'SessionDate', '2026-05-25')
+%   plots all sessions from that date.
+%
+%   summaryTable = multi_session.plotLickIntervalsByAnimal(sl, 'PeriodDays', 7)
+%   plots the latest session within the last 7 days.
+%
+%   summaryTable = multi_session.plotLickIntervalsByAnimal(sl, 'Plot', false)
 %   computes the summary table without drawing figures.
 
 p = inputParser;
-addRequired(p, 'T', @istable);
+addRequired(p, 'sl', @istable);
 addParameter(p, 'Plot', true, @(x) islogical(x) || (isnumeric(x) && isscalar(x)));
 addParameter(p, 'MaxX', 5, @(x) validateattributes(x, {'numeric'}, {'scalar','positive'}));
 addParameter(p, 'BinWidth', 0.1, @(x) validateattributes(x, {'numeric'}, {'scalar','positive'}));
 addParameter(p, 'FigurePosition', [100 100 1400 800], @(x) isnumeric(x) && numel(x) == 4);
-parse(p, T, varargin{:});
+addParameter(p, 'SessionNumber', 1, @(x) validateattributes(x, {'numeric'}, {'scalar','positive','integer'}));
+addParameter(p, 'SessionDate', [], @(x) isempty(x) || isdatetime(x) || ischar(x) || isstring(x));
+addParameter(p, 'PeriodDays', [], @(x) isempty(x) || (isnumeric(x) && isscalar(x) && x > 0));
+parse(p, sl, varargin{:});
 
-T = p.Results.T;
+sl = p.Results.sl;
 doPlot = logical(p.Results.Plot);
 maxX = p.Results.MaxX;
 binWidth = p.Results.BinWidth;
 figurePosition = p.Results.FigurePosition;
+sessionNumber = p.Results.SessionNumber;
+sessionDate = p.Results.SessionDate;
+periodDays = p.Results.PeriodDays;
+if ischar(sessionDate) || isstring(sessionDate)
+    sessionDate = datetime(sessionDate);
+end
 
 requiredFields = {'AnimalID', 'DateTime', 'FilePath'};
-if ~all(ismember(requiredFields, T.Properties.VariableNames))
+if ~all(ismember(requiredFields, sl.Properties.VariableNames))
     error('Table must contain AnimalID, DateTime, and FilePath columns.');
 end
-if ~isdatetime(T.DateTime)
+if ~isdatetime(sl.DateTime)
     error('DateTime must be a datetime array.');
 end
 
-validMask = ~isnat(T.DateTime);
+validMask = ~isnat(sl.DateTime);
 if ~any(validMask)
     error('No valid DateTime values found in table.');
 end
 
-T = T(validMask, :);
-if isempty(T)
+sl = sl(validMask, :);
+if isempty(sl)
     warning('No valid session rows found.');
     summaryTable = table();
     return;
 end
 
-animals = unique(T.AnimalID, 'stable');
+animals = unique(sl.AnimalID, 'stable');
 summaryRows = cell(numel(animals), 1);
 
 for i = 1:numel(animals)
     animal = animals{i};
-    rows = T(strcmp(T.AnimalID, animal), :);
+    rows = sl(strcmp(sl.AnimalID, animal), :);
     rows = sortrows(rows, 'DateTime', 'ascend');
-    latestRow = rows(end, :);
 
-    filePathCell = latestRow.FilePath(1);
-    if iscell(filePathCell)
-        filePath = filePathCell{1};
-    else
-        filePath = filePathCell;
-    end
-    filePath = char(filePath);
-
-    if ~exist(filePath, 'file')
-        warning('Skipping %s: file does not exist: %s', animal, filePath);
-        summaryRows{i} = table({animal}, {filePath}, latestRow.DateTime, 0, nan, nan, nan, nan, nan, nan, nan, nan, ...
-            'VariableNames', {'AnimalID','FilePath','DateTime','NIntervals','MeanInterval','MedianInterval','MinInterval','MaxInterval','MinQuietTime','MaxQuietTime','MinITI','MaxITI'});
+    sessionRows = unique(rows(:, {'FilePath', 'DateTime'}), 'rows', 'stable');
+    if isempty(sessionRows)
+        warning('No session rows found for %s.', animal);
         continue;
     end
 
-    try
-        SessionData = multi_session.loadSessionData(filePath);
-        intervals = multi_session.getLickIntervals(SessionData);
-        [minQuietTime, maxQuietTime, minITI, maxITI] = extractQuietAndITIRange(SessionData);
-    catch err
-        warning('Failed to load lick intervals for %s: %s', animal, err.message);
-        intervals = [];
-        minQuietTime = nan;
-        maxQuietTime = nan;
-        minITI = nan;
-        maxITI = nan;
+    [selectedSessionRows, aggregateSessions] = selectSessionRows(sessionRows, sessionNumber, sessionDate, periodDays);
+    if isempty(selectedSessionRows)
+        warning('No selectable session found for %s.', animal);
+        continue;
     end
 
-    if isempty(intervals)
-        summaryRows{i} = table({animal}, {filePath}, latestRow.DateTime, 0, nan, nan, nan, nan, minQuietTime, maxQuietTime, minITI, maxITI, ...
-            'VariableNames', {'AnimalID','FilePath','DateTime','NIntervals','MeanInterval','MedianInterval','MinInterval','MaxInterval','MinQuietTime','MaxQuietTime','MinITI','MaxITI'});
+    if aggregateSessions
+        filePathEntry = {selectedSessionRows.FilePath};
     else
-        summaryRows{i} = table({animal}, {filePath}, latestRow.DateTime, numel(intervals), mean(intervals), median(intervals), min(intervals), max(intervals), minQuietTime, maxQuietTime, minITI, maxITI, ...
-            'VariableNames', {'AnimalID','FilePath','DateTime','NIntervals','MeanInterval','MedianInterval','MinInterval','MaxInterval','MinQuietTime','MaxQuietTime','MinITI','MaxITI'});
+        filePathEntry = selectedSessionRows.FilePath(1);
     end
+
+    intervals = [];
+    minQuietTime = nan;
+    maxQuietTime = nan;
+    minITI = nan;
+    maxITI = nan;
+
+    filePathsToLoad = selectedSessionRows.FilePath;
+    for j = 1:numel(filePathsToLoad)
+        filePathCandidate = filePathsToLoad{j};
+        if iscell(filePathCandidate)
+            filePathCandidate = filePathCandidate{1};
+        end
+        filePathCandidate = char(filePathCandidate);
+
+        if ~exist(filePathCandidate, 'file')
+            warning('Skipping %s: file does not exist: %s', animal, filePathCandidate);
+            continue;
+        end
+
+        try
+            SessionData = multi_session.loadSessionData(filePathCandidate);
+            sessionIntervals = multi_session.getLickIntervals(SessionData);
+            intervals = [intervals; sessionIntervals(:)]; %#ok<AGROW>
+            [sessionMinQuiet, sessionMaxQuiet, sessionMinITI, sessionMaxITI] = extractQuietAndITIRange(SessionData);
+            minQuietTime = min([minQuietTime, sessionMinQuiet]);
+            maxQuietTime = max([maxQuietTime, sessionMaxQuiet]);
+            minITI = min([minITI, sessionMinITI]);
+            maxITI = max([maxITI, sessionMaxITI]);
+        catch err
+            warning('Failed to load lick intervals for %s from %s: %s', animal, filePathCandidate, err.message);
+        end
+    end
+
+    NIntervals = numel(intervals);
+    if isempty(intervals)
+        intervals = nan;
+    end
+    %     summaryRows{i} = table({animal}, filePathEntry, aggregateSessions, selectedSessionRows.DateTime(1),selectedSessionRows.DateTime(end), 0, nan, nan, nan, nan, minQuietTime, maxQuietTime, minITI, maxITI, ...
+    %         'VariableNames', {'AnimalID','FilePath','AggregateSessions','DateTime_first','DateTime_last','NIntervals','MeanInterval','MedianInterval','MinInterval','MaxInterval','MinQuietTime','MaxQuietTime','MinITI','MaxITI'});
+    % else
+    summaryRows{i} = table({animal}, filePathEntry, height(selectedSessionRows), selectedSessionRows.DateTime(1),selectedSessionRows.DateTime(end), NIntervals, mean(intervals), median(intervals), min(intervals), max(intervals), minQuietTime, maxQuietTime, minITI, maxITI, ...
+        'VariableNames', {'AnimalID','FilePath','NSessions','DateTime_first','DateTime_last','NIntervals','MeanInterval','MedianInterval','MinInterval','MaxInterval','MinQuietTime','MaxQuietTime','MinITI','MaxITI'});
+    % end
 end
 
 summaryTable = vertcat(summaryRows{:});
@@ -103,31 +146,44 @@ if doPlot && ~isempty(summaryTable)
         ax = subplot(nRows, nCols, i);
         axesHandles(i) = ax;
         animal = summaryTable.AnimalID{i};
-        latestRow = summaryTable(i, :);
-        if latestRow.NIntervals == 0
+        animalRow = summaryTable(i, :);
+        if animalRow.NIntervals == 0
             cla(ax);
             text(ax, 0.5, 0.5, 'No lick interval data', 'HorizontalAlignment', 'center', 'FontSize', 12);
-            title(ax, sprintf('%s (%s)', animal, string(latestRow.DateTime, 'yyyy-MM-dd HH:mm:ss')));
+            title(ax, sprintf('%s (%s)', animal, string(animalRow.DateTime_first, 'yyyy-MM-dd HH:mm:ss')));
             xlabel(ax, 'Lick Interval (seconds)');
             ylabel(ax, 'Count');
             continue;
         end
 
         try
-            filePathCell = latestRow.FilePath(1);
-            if iscell(filePathCell)
-                filePath = filePathCell{1};
+            filePathEntry = animalRow.FilePath{1};
+            if iscell(filePathEntry)
+                filePaths = filePathEntry;
             else
-                filePath = filePathCell;
+                filePaths = {char(filePathEntry)};
             end
-            filePath = char(filePath);
-            SessionData = multi_session.loadSessionData(filePath);
-            intervals = multi_session.getLickIntervals(SessionData);
+            intervals = [];
+            for j = 1:numel(filePaths)
+                filePathCandidate = filePaths{j};
+                if iscell(filePathCandidate)
+                    filePathCandidate = filePathCandidate{1};
+                end
+                filePathCandidate = char(filePathCandidate);
+
+                if ~exist(filePathCandidate, 'file')
+                    warning('Skipping missing file for plot: %s', filePathCandidate);
+                    continue;
+                end
+                SessionData = multi_session.loadSessionData(filePathCandidate);
+                sessionIntervals = multi_session.getLickIntervals(SessionData);
+                intervals = [intervals; sessionIntervals(:)];
+            end
         catch
             intervals = [];
         end
 
-        if isempty(intervals)
+        if NIntervals == 0 || all(isnan(intervals))
             cla(ax);
             text(ax, 0.5, 0.5, 'No lick interval data', 'HorizontalAlignment', 'center', 'FontSize', 12);
         else
@@ -140,26 +196,35 @@ if doPlot && ~isempty(summaryTable)
             ylabel(ax, 'Count');
             grid(ax, 'on');
 
-            if ~isnan(latestRow.MinQuietTime)
-                xline(ax, latestRow.MinQuietTime, '--', 'No-Lick Start', 'Color',[0,.5,0],'LineWidth',1.5,'LabelOrientation', 'horizontal', 'LabelHorizontalAlignment', 'right');
+            if ~isnan(animalRow.MinQuietTime)
+                xline(ax, animalRow.MinQuietTime, '--', 'No-Lick Start', 'Color',[0,.5,0],'LineWidth',1.5,'LabelOrientation', 'horizontal', 'LabelHorizontalAlignment', 'right');
             end
-            if ~isnan(latestRow.MaxQuietTime)
-                xline(ax, latestRow.MaxQuietTime, '-.', [newline,'No-Lick End'], 'Color',[0,.5,0],'LineWidth',1.5,'LabelOrientation', 'horizontal', 'LabelHorizontalAlignment', 'right');
+            if ~isnan(animalRow.MaxQuietTime)
+                xline(ax, animalRow.MaxQuietTime, '-.', [newline,'No-Lick End'], 'Color',[0,.5,0],'LineWidth',1.5,'LabelOrientation', 'horizontal', 'LabelHorizontalAlignment', 'right');
             end
-            if ~isnan(latestRow.MinITI)
-                xline(ax, latestRow.MinITI, '--', 'ITI Min', 'Color',[.8,0,0],'LineWidth',1.5, 'LabelOrientation',  'horizontal', 'LabelHorizontalAlignment', 'right');
+            if ~isnan(animalRow.MinITI)
+                xline(ax, animalRow.MinITI, '--', 'ITI Min', 'Color',[.8,0,0],'LineWidth',1.5, 'LabelOrientation',  'horizontal', 'LabelHorizontalAlignment', 'right');
             end
-            if ~isnan(latestRow.MaxITI)
-                xline(ax, latestRow.MaxITI, '-.', [newline,'ITI Max'], 'Color',[.8,0,0],'LineWidth',1.5, 'LabelOrientation',  'horizontal', 'LabelHorizontalAlignment', 'right');
+            if ~isnan(animalRow.MaxITI)
+                xline(ax, animalRow.MaxITI, '-.', [newline,'ITI Max'], 'Color',[.8,0,0],'LineWidth',1.5, 'LabelOrientation',  'horizontal', 'LabelHorizontalAlignment', 'right');
             end
         end
-
-        title(ax, sprintf('%s (%s)', animal, string(latestRow.DateTime, 'yyyy-MM-dd HH:mm:ss')));
+        if animalRow.NSessions == 1
+            % single session
+            titleStr = sprintf('%s (%s)', animal, string(animalRow.DateTime_first, 'yyyy-MM-dd HH:mm:ss'));
+        elseif strcmp(string(animalRow.DateTime_first, 'yyyy-MM-dd'), string(animalRow.DateTime_last, 'yyyy-MM-dd'))
+            % aggregate but single day
+            titleStr = sprintf('%s (%s: %d sessions)', animal, string(animalRow.DateTime_first, 'yyyy-MM-dd'), animalRow.NSessions);
+        else
+            % multiple days
+            titleStr = sprintf('%s (%s - %s: %d sessions)', animal, string(animalRow.DateTime_first, 'yyyy-MM-dd'), string(animalRow.DateTime_last, 'yyyy-MM-dd'), animalRow.NSessions);
+        end
+        title(ax, titleStr);
         xlabel(ax, 'Lick Interval (seconds)');
     end
 
     linkaxes(axesHandles, 'x');
-    sgtitle('Most Recent Session Lick Interval Histograms by Animal');
+    sgtitle('Selected Session Lick Interval Histograms by Animal');
 end
 
 function [minQuietTime, maxQuietTime, minITI, maxITI] = extractQuietAndITIRange(SessionData)
@@ -193,5 +258,45 @@ function [minQuietTime, maxQuietTime, minITI, maxITI] = extractQuietAndITIRange(
             end
         end
     end
+end
+
+function [selectedRows, aggregateSessions] = selectSessionRows(sessionRows, sessionNumber, sessionDate, periodDays)
+    aggregateSessions = false;
+
+    if ~isempty(sessionDate)
+        if isscalar(sessionDate)
+            sessionDate = dateshift(sessionDate, 'start', 'day');
+            startTime = sessionDate;
+            endTime = dateshift(sessionDate, 'end', 'day');
+        elseif numel(sessionDate) == 2
+            sessionDate = sort(sessionDate);
+            startTime = dateshift(sessionDate(1), 'start', 'day');
+            endTime = dateshift(sessionDate(2), 'end', 'day');
+        else
+            error('SessionDate must be a single date or a two-element date range.');
+        end
+        windowMask = sessionRows.DateTime >= startTime & sessionRows.DateTime <= endTime;
+        selectedRows = sessionRows(windowMask, :);
+        if isempty(selectedRows)
+            warning('No session found for the requested date range. Falling back to the latest session.');
+        else
+            aggregateSessions = height(selectedRows) > 1;
+            return;
+        end
+    elseif ~isempty(periodDays)
+        lastDate = dateshift(max(sessionRows.DateTime), 'end', 'day');
+        startDate = lastDate - days(periodDays);
+        windowMask = sessionRows.DateTime >= startDate & sessionRows.DateTime <= lastDate ;
+        selectedRows = sessionRows(windowMask, :);
+        if isempty(selectedRows)
+            warning('No session found within the last %g days. Falling back to the latest session.', periodDays);
+        else
+            aggregateSessions = height(selectedRows) > 1;
+            return;
+        end
+    end
+
+    sessionNumber = min(sessionNumber, height(sessionRows));
+    selectedRows = sessionRows(end - sessionNumber + 1, :);
 end
 end

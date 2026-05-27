@@ -12,8 +12,16 @@ nAnimals = length(animals);
 multi_session.plotLatestResponseByAnimal(T);
 % Response latency CDF by animal
 multi_session.plotResponseLatencyCDFByAnimal(T);
+
 % Most recent session lick interval histograms by animal
-multi_session.plotLickIntervalsByAnimal(T);
+multi_session.plotLickIntervalsByAnimal(sl);
+%% additional examples
+    % last 7 days
+multi_session.plotLickIntervalsByAnimal(sl,'PeriodDays',7);
+    % nth-most recent session
+multi_session.plotLickIntervalsByAnimal(sl,'SessionNumber',4);
+    % speicifed period
+multi_session.plotLickIntervalsByAnimal(sl,'SessionDate',["2026-05-01","2026-05-14"]);
 %% Progression of Response/False Alarm
 plotBy = 'DateTime';
 % plotBy = 'NumSession';
@@ -35,7 +43,7 @@ linkaxes([ax1,ax2,ax3],'x')
 %% Progression of left/right discrimination
 plotBy = 'DateTime';
 % plotBy = 'NumSession';
-% plotBy = 'DateReStart';
+plotBy = 'DateReStart';
 figure('Position',[100,20,1300,800]);
 t = tiledlayout(3,1,'TileSpacing','tight');
 % axis 1
@@ -53,7 +61,7 @@ yline(0,'k-','HandleVisibility','off');
 linkaxes([ax1,ax2,ax3],'x')
 %% Check configurations
 plotBy = 'NumSession';
-plotBy = 'DateReStart';
+% plotBy = 'DateReStart';
 figure('Position',[100,20,1300,800]);
 t = tiledlayout(4,1,'TileSpacing','tight');
 % axis 1
