@@ -5,8 +5,14 @@ function plotResponseLatencyCDFByAnimal(T, varargin)
 %   all trials in the latest period, grouped by animal. Catch trial
 %   responses are shown as a separate curve per animal.
 %
-%   multi_session.plotResponseLatencyCDFByAnimal(T, 'PeriodDays', d)
-%   uses a custom lookback period in days.
+%   multi_session.plotResponseLatencyCDFByAnimal(T, 'SessionNumber', 2)
+%   plots the second-most recent session per animal.
+%
+%   multi_session.plotResponseLatencyCDFByAnimal(T, 'SessionDate', '2026-05-25')
+%   plots all sessions from that date.
+%
+%   multi_session.plotResponseLatencyCDFByAnimal(T, 'PeriodDays', 7)
+%   plots the last 7 days of sessions per animal.
 %
 %   multi_session.plotResponseLatencyCDFByAnimal(T, 'ResWin', r)
 %   uses a fixed response window for all animals.
@@ -16,6 +22,8 @@ function plotResponseLatencyCDFByAnimal(T, varargin)
 
 p = inputParser;
 addRequired(p, 'T', @istable);
+addParameter(p, 'SessionNumber', 1, @(x) validateattributes(x, {'numeric'}, {'scalar','positive','integer'}));
+addParameter(p, 'SessionDate', [], @(x) isempty(x) || isdatetime(x) || ischar(x) || isstring(x));
 addParameter(p, 'PeriodDays', 7, @(x) validateattributes(x, {'numeric'}, {'scalar','positive'}));
 addParameter(p, 'ResWin', [], @(x) isempty(x) || (isnumeric(x) && isscalar(x) && x > 0));
 addParameter(p, 'BoundaryFreq', 550, @(x) validateattributes(x, {'numeric'}, {'scalar','nonnegative'}));
@@ -26,6 +34,8 @@ addParameter(p, 'Plot', true, @(x) islogical(x) || (isnumeric(x) && isscalar(x))
 parse(p, T, varargin{:});
 
 T = p.Results.T;
+sessionNumber = p.Results.SessionNumber;
+sessionDate = p.Results.SessionDate;
 periodDays = p.Results.PeriodDays;
 resWin = p.Results.ResWin;
 boundaryFreq = p.Results.BoundaryFreq;
@@ -33,6 +43,9 @@ lowColor = p.Results.LowColor;
 highColor = p.Results.HighColor;
 catchColor = p.Results.CatchColor;
 doPlot = logical(p.Results.Plot);
+if ischar(sessionDate) || isstring(sessionDate)
+    sessionDate = datetime(sessionDate);
+end
 
 requiredVars = {'AnimalID','DateTime','NTrials','VibFreq','ResponseLatenciesLeft','ResponseLatenciesRight','ResponseLatenciesCatch'};
 if ~all(ismember(requiredVars, T.Properties.VariableNames))
@@ -48,15 +61,14 @@ if ~any(validMask)
 end
 
 T = T(validMask, :);
-endTime = max(T.DateTime);
-startTime = endTime - days(periodDays);
-periodMask = T.DateTime >= startTime & T.DateTime <= endTime;
-Tperiod = T(periodMask, :);
-
+[Tperiod, selectionSummary] = multi_session.selectSessionsByAnimal(T, 'SessionNumber', sessionNumber, 'SessionDate', sessionDate, 'PeriodDays', periodDays);
 if isempty(Tperiod)
-    warning('No records found in the last %d days.', periodDays);
+    warning('No records found using the selected session criteria.');
     return;
 end
+
+startTime = min(Tperiod.DateTime);
+endTime = max(Tperiod.DateTime);
 
 animalIDs = unique(Tperiod.AnimalID);
 if isempty(animalIDs)

@@ -4,21 +4,34 @@ function summaryTable = plotLatestResponseByAnimal(T, varargin)
 %   summarizes the last 7 days from the latest record in T.DateTime,
 %   including catch trials, and shows one subplot per AnimalID.
 %
+%   summaryTable = multi_session.summarizeLatestResponseByAnimal(T, 'SessionNumber', n)
+%   uses the n-th latest session per animal.
+%
+%   summaryTable = multi_session.summarizeLatestResponseByAnimal(T, 'SessionDate', '2026-05-25')
+%   uses all sessions from that date.
+%
 %   summaryTable = multi_session.summarizeLatestResponseByAnimal(T, 'PeriodDays', d)
-%   allows changing the lookback period in days.
+%   uses the last d days of sessions per animal.
 %
 %   summaryTable = multi_session.summarizeLatestResponseByAnimal(T, 'Plot', false)
 %   suppresses plotting.
 
 p = inputParser;
 addRequired(p, 'T', @istable);
+addParameter(p, 'SessionNumber', 1, @(x) validateattributes(x, {'numeric'}, {'scalar','positive','integer'}));
+addParameter(p, 'SessionDate', [], @(x) isempty(x) || isdatetime(x) || ischar(x) || isstring(x));
 addParameter(p, 'PeriodDays', 7, @(x) validateattributes(x, {'numeric'}, {'scalar','positive'}));
 addParameter(p, 'Plot', true, @(x) islogical(x) || (isnumeric(x) && isscalar(x)));
 parse(p, T, varargin{:});
 
 T = p.Results.T;
+sessionNumber = p.Results.SessionNumber;
+sessionDate = p.Results.SessionDate;
 periodDays = p.Results.PeriodDays;
 doPlot = logical(p.Results.Plot);
+if ischar(sessionDate) || isstring(sessionDate)
+    sessionDate = datetime(sessionDate);
+end
 
 if ~ismember('DateTime', T.Properties.VariableNames) || ~isdatetime(T.DateTime)
     error('Table must contain DateTime as datetime array.');
@@ -33,16 +46,15 @@ if ~any(validMask)
 end
 
 T = T(validMask, :);
-endTime = max(T.DateTime);
-startTime = endTime - days(periodDays);
-periodMask = T.DateTime >= startTime & T.DateTime <= endTime;
-Tperiod = T(periodMask, :);
-
+[Tperiod, selectionSummary] = multi_session.selectSessionsByAnimal(T, 'SessionNumber', sessionNumber, 'SessionDate', sessionDate, 'PeriodDays', periodDays);
 if isempty(Tperiod)
-    warning('No records found in the last %d days.', periodDays);
+    warning('No records found using the selected session criteria.');
     summaryTable = table();
     return;
 end
+
+startTime = min(Tperiod.DateTime);
+endTime = max(Tperiod.DateTime);
 
 % Aggregate counts by animal and stimulus combination
 summaryTable = varfun(@sum, Tperiod, ...
