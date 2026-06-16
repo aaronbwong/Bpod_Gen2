@@ -70,23 +70,19 @@ for i = 1:numel(animals)
     rows = sl(strcmp(sl.AnimalID, animal), :);
     rows = sortrows(rows, 'DateTime', 'ascend');
 
-    sessionRows = unique(rows(:, {'FilePath', 'DateTime'}), 'rows', 'stable');
-    if isempty(sessionRows)
-        warning('No session rows found for %s.', animal);
-        continue;
-    end
-
-    [selectedSessionRows, aggregateSessions] = selectSessionRows(sessionRows, sessionNumber, sessionDate, periodDays);
-    if isempty(selectedSessionRows)
+    [selectedRowsForAnimal, summaryRow] = multi_session.selectSessionsByAnimal(rows, ...
+        'SessionNumber', sessionNumber, ...
+        'SessionDate', sessionDate, ...
+        'PeriodDays', periodDays);
+    if isempty(selectedRowsForAnimal)
         warning('No selectable session found for %s.', animal);
         continue;
     end
 
-    if aggregateSessions
-        filePathEntry = {selectedSessionRows.FilePath};
-    else
-        filePathEntry = selectedSessionRows.FilePath(1);
-    end
+    filePathEntry = summaryRow.FilePaths{1};
+    NselectedSessions = summaryRow.NSessions(1);
+    firstDate = summaryRow.DateTime_first(1);
+    lastDate = summaryRow.DateTime_last(1);
 
     intervals = [];
     minQuietTime = nan;
@@ -94,7 +90,7 @@ for i = 1:numel(animals)
     minITI = nan;
     maxITI = nan;
 
-    filePathsToLoad = selectedSessionRows.FilePath;
+    filePathsToLoad = unique(selectedRowsForAnimal.FilePath, 'stable');
     for j = 1:numel(filePathsToLoad)
         filePathCandidate = filePathsToLoad{j};
         if iscell(filePathCandidate)
@@ -125,12 +121,8 @@ for i = 1:numel(animals)
     if isempty(intervals)
         intervals = nan;
     end
-    %     summaryRows{i} = table({animal}, filePathEntry, aggregateSessions, selectedSessionRows.DateTime(1),selectedSessionRows.DateTime(end), 0, nan, nan, nan, nan, minQuietTime, maxQuietTime, minITI, maxITI, ...
-    %         'VariableNames', {'AnimalID','FilePath','AggregateSessions','DateTime_first','DateTime_last','NIntervals','MeanInterval','MedianInterval','MinInterval','MaxInterval','MinQuietTime','MaxQuietTime','MinITI','MaxITI'});
-    % else
-    summaryRows{i} = table({animal}, filePathEntry, height(selectedSessionRows), selectedSessionRows.DateTime(1),selectedSessionRows.DateTime(end), NIntervals, mean(intervals), median(intervals), min(intervals), max(intervals), minQuietTime, maxQuietTime, minITI, maxITI, ...
+    summaryRows{i} = table({animal}, filePathEntry, NselectedSessions, firstDate, lastDate, NIntervals, mean(intervals), median(intervals), min(intervals), max(intervals), minQuietTime, maxQuietTime, minITI, maxITI, ...
         'VariableNames', {'AnimalID','FilePath','NSessions','DateTime_first','DateTime_last','NIntervals','MeanInterval','MedianInterval','MinInterval','MaxInterval','MinQuietTime','MaxQuietTime','MinITI','MaxITI'});
-    % end
 end
 
 summaryTable = vertcat(summaryRows{:});
@@ -225,7 +217,8 @@ if doPlot && ~isempty(summaryTable)
 
     linkaxes(axesHandles, 'x');
     sgtitle('Selected Session Lick Interval Histograms by Animal');
-end
+end %if
+end % function plotLickIntervalsByAnimal()
 
 function [minQuietTime, maxQuietTime, minITI, maxITI] = extractQuietAndITIRange(SessionData)
     minQuietTime = nan;
@@ -260,43 +253,3 @@ function [minQuietTime, maxQuietTime, minITI, maxITI] = extractQuietAndITIRange(
     end
 end
 
-function [selectedRows, aggregateSessions] = selectSessionRows(sessionRows, sessionNumber, sessionDate, periodDays)
-    aggregateSessions = false;
-
-    if ~isempty(sessionDate)
-        if isscalar(sessionDate)
-            sessionDate = dateshift(sessionDate, 'start', 'day');
-            startTime = sessionDate;
-            endTime = dateshift(sessionDate, 'end', 'day');
-        elseif numel(sessionDate) == 2
-            sessionDate = sort(sessionDate);
-            startTime = dateshift(sessionDate(1), 'start', 'day');
-            endTime = dateshift(sessionDate(2), 'end', 'day');
-        else
-            error('SessionDate must be a single date or a two-element date range.');
-        end
-        windowMask = sessionRows.DateTime >= startTime & sessionRows.DateTime <= endTime;
-        selectedRows = sessionRows(windowMask, :);
-        if isempty(selectedRows)
-            warning('No session found for the requested date range. Falling back to the latest session.');
-        else
-            aggregateSessions = height(selectedRows) > 1;
-            return;
-        end
-    elseif ~isempty(periodDays)
-        lastDate = dateshift(max(sessionRows.DateTime), 'end', 'day');
-        startDate = lastDate - days(periodDays);
-        windowMask = sessionRows.DateTime >= startDate & sessionRows.DateTime <= lastDate ;
-        selectedRows = sessionRows(windowMask, :);
-        if isempty(selectedRows)
-            warning('No session found within the last %g days. Falling back to the latest session.', periodDays);
-        else
-            aggregateSessions = height(selectedRows) > 1;
-            return;
-        end
-    end
-
-    sessionNumber = min(sessionNumber, height(sessionRows));
-    selectedRows = sessionRows(end - sessionNumber + 1, :);
-end
-end
