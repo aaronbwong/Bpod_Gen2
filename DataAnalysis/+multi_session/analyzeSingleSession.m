@@ -25,6 +25,7 @@ else
     datetimeStr = '';
 end
 
+% --- Extract GUI settings and create session metadata table ---
 GUI_settings = struct2table([SessionData.TrialSettings(:).GUI]);
 GUI_settings = unique(GUI_settings, 'rows');
 if height(GUI_settings) == 1
@@ -35,16 +36,20 @@ else
     MinQuietTime = min(GUI_settings.MinQuietTime);
     MaxQuietTime = max(GUI_settings.MaxQuietTime);
     RewardAmount = mean(GUI_settings.RewardAmount);
-    ResWin = mean(GUI_settings.ResWin);
-    CutOffPeriod = mean(GUI_settings.CutOffPeriod);
-    sessionMetaTable = table(MinITI, MaxITI, MinQuietTime, MaxQuietTime, RewardAmount, ResWin, CutOffPeriod);
+    sessionMetaTable = table(MinITI, MaxITI, MinQuietTime, MaxQuietTime, RewardAmount);
+    if ismember('ResWin', GUI_settings.Properties.VariableNames)
+        sessionMetaTable.ResWin = mean(GUI_settings.ResWin);
+    end
+    if ismember('NCorrectToSwitch', GUI_settings.Properties.VariableNames)
+        sessionMetaTable.NCorrectToSwitch = mean(GUI_settings.NCorrectToSwitch);
+    end    
+    if ismember('CutOffPeriod', GUI_settings.Properties.VariableNames)
+        sessionMetaTable.CutOffPeriod = mean(GUI_settings.CutOffPeriod);
+    end
 end
-if ~ismember('NCorrectToSwitch', GUI_settings.Properties.VariableNames)
-    sessionMetaTable.NCorrectToSwitch = nan(1);
-elseif ~ismember('NCorrectToSwitch', sessionMetaTable.Properties.VariableNames)
-    sessionMetaTable.NCorrectToSwitch = mean(GUI_settings.NCorrectToSwitch);
-end
+% ----------------------------------------------------------------
 
+% --- Get StimTable ---
 if ~isfield(SessionData, 'StimTable')
     assert(isfield(SessionData, 'CurrentSide') && isfield(SessionData, 'LeftRightSeq'), ...
         'Cannot rebuild StimTable: CurrentSide or LeftRightSeq missing.');
@@ -73,6 +78,8 @@ requiredVars = {'VibFreq', 'VibAmp'};
 if ~all(ismember(requiredVars, StimTable.Properties.VariableNames))
     error('StimTable must contain VibFreq and VibAmp columns.');
 end
+% ------------------------------------
+
 
 vibFreqs = StimTable.VibFreq(:);
 vibAmps = StimTable.VibAmp(:);
@@ -150,7 +157,7 @@ sessionTable.AnimalID = repmat({animalID}, nCombos, 1);
 sessionTable.Protocol = repmat({protocol}, nCombos, 1);
 sessionTable.Time = repmat({datetimeStr}, nCombos, 1);
 sessionTable.Session_nTrials = repmat(nTrials, nCombos, 1);
-sessionTable.ResWin = repmat(sessionMetaTable.ResWin, nCombos, 1);
+% sessionTable.ResWin = repmat(sessionMetaTable.ResWin, nCombos, 1);
 
 sessionMetaTable.FileName = {filename};
 sessionMetaTable.AnimalID = {animalID};

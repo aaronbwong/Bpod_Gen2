@@ -53,11 +53,52 @@ for fileIdx = 1:numel(selectedFiles)
         sessionTable = movevars(sessionTable, 'FilePath', 'Before', 'FileName');
         sessionMetaTable.FilePath = {absolutePath};
         sessionMetaTable = movevars(sessionMetaTable, 'FilePath', 'Before', 'FileName');
-        resultsTable = [resultsTable; sessionTable]; %#ok<AGROW>
-        metaTable = [metaTable; sessionMetaTable]; %#ok<AGROW>
+        
+        % Harmonize and concatenate tables
+        resultsTable = appendTables(resultsTable, sessionTable);
+        metaTable = appendTables(metaTable, sessionMetaTable);
         fprintf('Current session analysed successfully\n');
     catch err
         warning('Analysis failed for %s: %s', filename, err.message);
+        keyboard
     end
 end
+end
+
+%% Local helper function
+function tableOut = appendTables(table1, table2)
+    %appendTables Append two tables, combining variables from both with stable order.
+    %   tableOut = appendTables(table1, table2) combines variables from both tables,
+    %   prioritizing table1's variables first (in their original order), then adds
+    %   any additional variables from table2. Missing variables are filled with NaN.
+    
+    if isempty(table1); tableOut=table2;return;end
+    if isempty(table2); tableOut=table1;return;end
+
+    varNames1 = table1.Properties.VariableNames;
+    varNames2 = table2.Properties.VariableNames;
+    
+    % Combine variable names: table1's vars first, then table2's unique vars (stable order)
+    allVarNames = unique([varNames1,varNames2],'stable');%[varNames1, setdiff(varNames2, varNames1, 'stable')];
+    
+    % Add missing variables to table1
+    for i = 1:length(allVarNames)
+        varName = allVarNames{i};
+        if ~ismember(varName, table1.Properties.VariableNames)
+            table1.(varName) = nan(height(table1), 1);
+        end
+    end
+    
+    % Add missing variables to table2
+    for i = 1:length(allVarNames)
+        varName = allVarNames{i};
+        if ~ismember(varName, table2.Properties.VariableNames)
+            table2.(varName) = nan(height(table2), 1);
+        end
+    end
+    
+    % Reorder both tables to match combined column order
+    table1 = table1(:, allVarNames);
+    table2 = table2(:, allVarNames);
+    tableOut = [table1; table2];
 end
