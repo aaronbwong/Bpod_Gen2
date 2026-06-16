@@ -79,7 +79,7 @@ for i = 1:numel(animals)
         continue;
     end
 
-    filePathEntry = summaryRow.FilePaths{1};
+    filePathEntry = summaryRow.FilePaths(1);
     NselectedSessions = summaryRow.NSessions(1);
     firstDate = summaryRow.DateTime_first(1);
     lastDate = summaryRow.DateTime_last(1);
