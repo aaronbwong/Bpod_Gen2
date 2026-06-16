@@ -7,21 +7,39 @@ end
 [sl,T] = analyseSessionResults(resultsTable,metaTable);
 animals = unique(sl.AnimalID);
 nAnimals = length(animals);
+%% save table for later
+load('DEFAULT_FILE_PATHS.mat','DEFAULT_OUTPUT_FOLDER')
+folderName = sprintf('results%s-%s',animals{1},animals{end});
+fileName = sprintf('results%s-%s_%s.mat',animals{1},animals{end},datetime('today','Format','yyyyMMdd'));
+save(fullfile(DEFAULT_OUTPUT_FOLDER,folderName,fileName),'sl','T','animals','nAnimals');
+%% load table 
+folderName = 'resultsY006-Y013';fileName = 'resultsY006-Y013_20260616.mat';
+folderName = 'resultsY001-Y004';fileName = 'resultsY001-Y004_20260616.mat';
+load(fullfile(DEFAULT_OUTPUT_FOLDER,folderName,fileName),'sl','T','animals','nAnimals');
 %% Plotting
 % Hit Rate Barplots by animal
 multi_session.plotLatestResponseByAnimal(T);
 % Response latency CDF by animal
-multi_session.plotResponseLatencyCDFByAnimal(T);
+multi_session.plotResponseLatencyCDFByAnimal(T,'BoundaryFreq',250);
 
 % Most recent session lick interval histograms by animal
 multi_session.plotLickIntervalsByAnimal(sl);
 %% additional examples
+    % last session
+multi_session.plotLatestResponseByAnimal(T,'PeriodDays',1);
+multi_session.plotResponseLatencyCDFByAnimal(T,'PeriodDays',1);
     % last 7 days
 multi_session.plotLickIntervalsByAnimal(sl,'PeriodDays',7);
     % nth-most recent session
 multi_session.plotLickIntervalsByAnimal(sl,'SessionNumber',4);
     % speicifed period
-multi_session.plotLickIntervalsByAnimal(sl,'SessionDate',["2026-05-01","2026-05-14"]);
+    analysisPeriod = ["2026-05-01","2026-05-14"];
+multi_session.plotLickIntervalsByAnimal(sl,'SessionDate',analysisPeriod);
+multi_session.plotResponseLatencyCDFByAnimal(T,'SessionDate',analysisPeriod);
+multi_session.plotResponseLatencyCDFByAnimal(T,'SessionDate',analysisPeriod,...
+                                               'ResWin',0.5);
+multi_session.plotLatestResponseByAnimal(T,'SessionDate',analysisPeriod);
+
 %% Progression of Response/False Alarm
 plotBy = 'DateTime';
 % plotBy = 'NumSession';
