@@ -787,59 +787,12 @@ function [tempLeftLicks, tempRightLicks, tempLeftReward, tempRightReward, ...
            idx <= length(SessionData.RawEvents.Trial) && ...
            isfield(SessionData.RawEvents.Trial{idx}, 'Events')
             
-            if isfield(SessionData.RawEvents.Trial{idx}.Events, 'Port1In')
-                port1InTimes = SessionData.RawEvents.Trial{idx}.Events.Port1In;
-                if ~isempty(port1InTimes)
-                    trialStartTime = 0;
-                    stimulusStart = NaN;
-                    if isfield(SessionData.RawEvents.Trial{idx}, 'States') && ...
-                       isfield(SessionData.RawEvents.Trial{idx}.States, 'Stimulus')
-                        stimulusStart = SessionData.RawEvents.Trial{idx}.States.Stimulus(1);
-                    end
-                    
-                    if ~isnan(stimulusStart)
-                        port1InBeforeOrDuringStimulus = port1InTimes <= stimulusStart;
-                    else
-                        port1InBeforeOrDuringStimulus = port1InTimes >= trialStartTime & port1InTimes <= 10;
-                    end
-                    
-                    if any(port1InBeforeOrDuringStimulus)
-                        if ~isnan(tempLeftReward)
-                            try
-                                leftRewardAbsTime = Session_tbl.LeftReward(idx,1);
-                                if ~isnan(stimulusStart)
-                                    timeFromPort1ToReward = leftRewardAbsTime - port1InTimes;
-                                    if any(timeFromPort1ToReward > 0 & timeFromPort1ToReward < 2 & port1InBeforeOrDuringStimulus)
-                                        isLeftRewardFromPort1 = true;
-                                    end
-                                else
-                                    timeDiff = abs(port1InTimes - leftRewardAbsTime);
-                                    if any(timeDiff < 2 & port1InBeforeOrDuringStimulus)
-                                        isLeftRewardFromPort1 = true;
-                                    end
-                                end
-                            catch
-                            end
-                        end
-                        
-                        if ~isnan(tempRightReward)
-                            try
-                                rightRewardAbsTime = Session_tbl.RightReward(idx,1);
-                                if ~isnan(stimulusStart)
-                                    timeFromPort1ToReward = rightRewardAbsTime - port1InTimes;
-                                    if any(timeFromPort1ToReward > 0 & timeFromPort1ToReward < 2 & port1InBeforeOrDuringStimulus)
-                                        isRightRewardFromPort1 = true;
-                                    end
-                                else
-                                    timeDiff = abs(port1InTimes - rightRewardAbsTime);
-                                    if any(timeDiff < 2 & port1InBeforeOrDuringStimulus)
-                                        isRightRewardFromPort1 = true;
-                                    end
-                                end
-                            catch
-                            end
-                        end
-                    end
+            if isfield(SessionData.RawEvents.Trial{idx}.Events, 'Condition6')
+                if ~isnan(tempLeftReward)
+                    isLeftRewardFromPort1 = true;
+                end
+                if ~isnan(tempRightReward)
+                    isRightRewardFromPort1 = true;
                 end
             end
         end
