@@ -1,5 +1,4 @@
 function DispenseByDur(ValveNum,ValveTime_s,NumberOfDrops)
-    global BpodSystem
 
     if nargin < 3; NumberOfDrops = 1; end
     InterDropInterval = 0.5; %s
@@ -32,7 +31,7 @@ function DispenseByDur(ValveNum,ValveTime_s,NumberOfDrops)
         SendStateMachine(sma);
     
         % Run state machine
-        RawEvents = RunStateMachine;
+        RunStateMachine;
 
         pause(InterDropInterval)
     end
