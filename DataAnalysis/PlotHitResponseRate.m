@@ -259,7 +259,8 @@ function PlotHitResponseRate(SessionData, varargin)
     xlabel(ax, 'Trial Number');
     ylabel(ax, 'Rate');
     title(ax, ['Hit Rate and Response Rate Over Trials (window size = ' num2str(windowSize) ' trials)']);
-    legend(ax, 'Location', 'best');
+    lgd = legend(ax, 'Location', 'best');
+    lgd.Box = 'off'; lgd.Color = 'none';
     grid(ax, 'on');
     ylim(ax, [0 1]);
     xlim(ax, [1 nTrials]);
