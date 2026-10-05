@@ -1,7 +1,7 @@
 %% 1. load behavioural data from multiple files
 clearvars
 try
-    load('DEFAULT_FILE_PATHS.mat','DEFAULT_DATA_FOLDER')
+    load('DEFAULT_FILE_PATHS.mat','DEFAULT_DATA_FOLDER','DEFAULT_OUTPUT_FOLDER')
 catch
     warning('No default file path file. Using current directory instead.');
     DEFAULT_DATA_FOLDER = pwd;
@@ -12,9 +12,17 @@ if ~exist(DEFAULT_DATA_FOLDER, 'dir')
     DEFAULT_DATA_FOLDER = pwd;
 end
 
+% Check if output path exists, if not use current directory + 'output'
+if ~exist('DEFAULT_OUTPUT_FOLDER','var') || ~exist(DEFAULT_OUTPUT_FOLDER, 'dir')
+    DEFAULT_OUTPUT_FOLDER = fullfile(DEFAULT_DATA_FOLDER,'output');
+    [~,~] = mkdir(DEFAULT_OUTPUT_FOLDER);
+end
+
 % Initialize file list
-selectedFiles = {};
 currentPath = DEFAULT_DATA_FOLDER;
+savePath = DEFAULT_OUTPUT_FOLDER;
+% selectedFiles = multi_session.selectSubjectFolders(currentPath);
+selectedFiles = {};
 
 % Loop to select multiple files from different directories
 fprintf('=== File Selection ===\n');
@@ -27,7 +35,7 @@ while true
         sprintf('Select file(s) (Cancel to finish) - Currently %d file(s) selected', fileCount), ...
         currentPath, ...
         'MultiSelect', 'on');
-    
+
     % Check if user canceled
     if isequal(filename, 0) || isequal(filepath, 0)
         if fileCount == 0
@@ -38,7 +46,7 @@ while true
             break;
         end
     end
-    
+
     % Handle both single file (string) and multiple files (cell array)
     if ischar(filename)
         % Single file selected - convert to cell array for uniform processing
@@ -47,7 +55,7 @@ while true
         % Multiple files selected - filename is already a cell array
         filenames = filename;
     end
-    
+
     % Add all selected files to list
     for i = 1:length(filenames)
         fileCount = fileCount + 1;
@@ -56,7 +64,7 @@ while true
         fprintf('File %d: %s\n', fileCount, fullPath);
     end
     currentPath = filepath; % Remember last directory for next selection
-    
+
     % Ask if user wants to select more files
     if isscalar(filenames)
         msg = sprintf('File %d selected:\n%s\n\nDo you want to select more files?', ...
@@ -65,11 +73,11 @@ while true
         msg = sprintf('%d files selected (total: %d)\n\nDo you want to select more files?', ...
             length(filenames), fileCount);
     end
-    
+
     choice = questdlg(msg, ...
         'File Selection', ...
         'Yes', 'No', 'Yes');
-    
+
     if strcmp(choice, 'No')
         fprintf('\nFinished selecting files. Total: %d file(s)\n\n', fileCount);
         break;
@@ -85,20 +93,17 @@ for fileIdx = 1:numFiles
     absolute_path = selectedFiles{fileIdx};
     
     % Get filepath and filename from full path
-    [filepath, filename, ~] = fileparts(absolute_path);
-    filename = [filename, '.mat'];  % Add extension back for display
-    
-    % Get filename without extension
-    [~, name_only, ~] = fileparts(absolute_path);
-    
+    [filepath, name_only, extension] = fileparts(absolute_path);
+    filename = [name_only, extension];  % Add extension back for display
+
+    % parse name
+    [subjectStr,protocolStr,dateTimeStr] = parseBpodFileName(name_only);
+
     % Display file information
     disp('========================================');
     disp(['Processing file ' num2str(fileIdx) ' of ' num2str(numFiles) ': ' filename]);
     disp(['File path: ' absolute_path]);
-    
-    % Load file based on file type
-    [~, ~, extension] = fileparts(filename);
-    
+       
     switch lower(extension)
         case {'.mat'}
             % Load MAT file
@@ -115,83 +120,83 @@ for fileIdx = 1:numFiles
     disp(['File size: ' num2str(file_info.bytes) ' bytes']);
     disp('Behavior Data loaded');
 
-    %% Plot and save figure
-    % Plot functions create their own figures, so we get the figure handles after plotting
-    PlotLickIntervals(SessionData);
-    figLickIntervals = gcf;  % Get the current figure handle after plotting
-
-    PlotResLatency(SessionData);
-    figResLatency = gcf;  % Get the current figure handle after plotting
-
-    PlotLickRaster(SessionData);
-    figRaster = gcf;  % Get the current figure handle after plotting
-
-    PlotSessionSummary(SessionData);
-    figSessionSummary = gcf;  % Get the current figure handle after plotting
-
-    PlotCDFHitRate(SessionData);
-    figCDFHitRate = gcf;  % Get the current figure handle after plotting
-
-    PlotBarResponse(SessionData);
-    figBarResponse = gcf;  % Get the current figure handle after plotting
-
-    PlotHitResponseRate(SessionData);
-    figHitResponseRate = gcf;  % Get the current figure handle after plotting
-
-    % Save figures to the same directory as the loaded file
-    savePath = filepath;  % Use the directory where the data file was loaded from
-
-    % Save figures with proper settings to prevent position shifts
-    try
-        % Use exportgraphics if available (better layout preservation)
-        exportgraphics(figLickIntervals, fullfile(savePath, [name_only,'_LickIntervals', '.png']), ...
-            'Resolution', 300, 'ContentType', 'image');
-        exportgraphics(figResLatency, fullfile(savePath, [name_only,'_ResLatency', '.png']), ...
-            'Resolution', 300, 'ContentType', 'image');
-        exportgraphics(figRaster, fullfile(savePath, [name_only,'_Raster', '.png']), ...
-            'Resolution', 300, 'ContentType', 'image');
-        exportgraphics(figSessionSummary, fullfile(savePath, [name_only,'_SessionSummary', '.png']), ...
-            'Resolution', 300, 'ContentType', 'image');
-        exportgraphics(figCDFHitRate, fullfile(savePath, [name_only,'_CDFHitRate', '.png']), ...
-            'Resolution', 300, 'ContentType', 'image');
-        exportgraphics(figBarResponse, fullfile(savePath, [name_only,'_BarResponse', '.png']), ...
-            'Resolution', 300, 'ContentType', 'image');
-        exportgraphics(figHitResponseRate, fullfile(savePath, [name_only,'_HitResponseRate', '.png']), ...
-            'Resolution', 300, 'ContentType', 'image');
-    catch
-        % Force figure to render before capturing
-        drawnow;
-        
-        % Save Lick Intervals figure
-        frame = getframe(figLickIntervals);
-        imwrite(frame.cdata, fullfile(savePath, [name_only,'_LickIntervals',  '.png']), 'PNG');
-        
-        % Save Response Latency figure
-        frame = getframe(figResLatency);
-        imwrite(frame.cdata, fullfile(savePath, [name_only,'_ResLatency',  '.png']), 'PNG');
-        
-        % Save Raster plot figure
-        frame = getframe(figRaster);
-        imwrite(frame.cdata, fullfile(savePath, [name_only,'_Raster',  '.png']), 'PNG');
-        
-        % Save Session Summary figure
-        frame = getframe(figSessionSummary);
-        imwrite(frame.cdata, fullfile(savePath, [name_only,'_SessionSummary',  '.png']), 'PNG');
-        
-        % Save CDF Hit Rate figure
-        frame = getframe(figCDFHitRate);
-        imwrite(frame.cdata, fullfile(savePath, [name_only,'_CDFHitRate',  '.png']), 'PNG');
-        
-        % Save Bar Response figure
-        frame = getframe(figBarResponse);
-        imwrite(frame.cdata, fullfile(savePath, [name_only,'_BarResponse',  '.png']), 'PNG');
-        
-        % Save Hit Response Rate figure
-        frame = getframe(figHitResponseRate);
-        imwrite(frame.cdata, fullfile(savePath, [name_only,'_HitResponseRate',  '.png']), 'PNG');
-    end
-
-    disp(['Figures saved to: ' savePath]);
+    % %% Plot and save figure
+    % % Plot functions create their own figures, so we get the figure handles after plotting
+    % PlotLickIntervals(SessionData);
+    % figLickIntervals = gcf;  % Get the current figure handle after plotting
+    % 
+    % PlotResLatency(SessionData);
+    % figResLatency = gcf;  % Get the current figure handle after plotting
+    % 
+    % PlotLickRaster(SessionData);
+    % figRaster = gcf;  % Get the current figure handle after plotting
+    % 
+    % PlotSessionSummary(SessionData);
+    % figSessionSummary = gcf;  % Get the current figure handle after plotting
+    % 
+    % PlotCDFHitRate(SessionData);
+    % figCDFHitRate = gcf;  % Get the current figure handle after plotting
+    % 
+    % PlotBarResponse(SessionData);
+    % figBarResponse = gcf;  % Get the current figure handle after plotting
+    % 
+    % PlotHitResponseRate(SessionData);
+    % figHitResponseRate = gcf;  % Get the current figure handle after plotting
+    % 
+    % % Save figures to the same directory as the loaded file
+    % savePath = filepath;  % Use the directory where the data file was loaded from
+    % 
+    % % Save figures with proper settings to prevent position shifts
+    % try
+    %     % Use exportgraphics if available (better layout preservation)
+    %     exportgraphics(figLickIntervals, fullfile(savePath, [name_only,'_LickIntervals', '.png']), ...
+    %         'Resolution', 300, 'ContentType', 'image');
+    %     exportgraphics(figResLatency, fullfile(savePath, [name_only,'_ResLatency', '.png']), ...
+    %         'Resolution', 300, 'ContentType', 'image');
+    %     exportgraphics(figRaster, fullfile(savePath, [name_only,'_Raster', '.png']), ...
+    %         'Resolution', 300, 'ContentType', 'image');
+    %     exportgraphics(figSessionSummary, fullfile(savePath, [name_only,'_SessionSummary', '.png']), ...
+    %         'Resolution', 300, 'ContentType', 'image');
+    %     exportgraphics(figCDFHitRate, fullfile(savePath, [name_only,'_CDFHitRate', '.png']), ...
+    %         'Resolution', 300, 'ContentType', 'image');
+    %     exportgraphics(figBarResponse, fullfile(savePath, [name_only,'_BarResponse', '.png']), ...
+    %         'Resolution', 300, 'ContentType', 'image');
+    %     exportgraphics(figHitResponseRate, fullfile(savePath, [name_only,'_HitResponseRate', '.png']), ...
+    %         'Resolution', 300, 'ContentType', 'image');
+    % catch
+    %     % Force figure to render before capturing
+    %     drawnow;
+    % 
+    %     % Save Lick Intervals figure
+    %     frame = getframe(figLickIntervals);
+    %     imwrite(frame.cdata, fullfile(savePath, [name_only,'_LickIntervals',  '.png']), 'PNG');
+    % 
+    %     % Save Response Latency figure
+    %     frame = getframe(figResLatency);
+    %     imwrite(frame.cdata, fullfile(savePath, [name_only,'_ResLatency',  '.png']), 'PNG');
+    % 
+    %     % Save Raster plot figure
+    %     frame = getframe(figRaster);
+    %     imwrite(frame.cdata, fullfile(savePath, [name_only,'_Raster',  '.png']), 'PNG');
+    % 
+    %     % Save Session Summary figure
+    %     frame = getframe(figSessionSummary);
+    %     imwrite(frame.cdata, fullfile(savePath, [name_only,'_SessionSummary',  '.png']), 'PNG');
+    % 
+    %     % Save CDF Hit Rate figure
+    %     frame = getframe(figCDFHitRate);
+    %     imwrite(frame.cdata, fullfile(savePath, [name_only,'_CDFHitRate',  '.png']), 'PNG');
+    % 
+    %     % Save Bar Response figure
+    %     frame = getframe(figBarResponse);
+    %     imwrite(frame.cdata, fullfile(savePath, [name_only,'_BarResponse',  '.png']), 'PNG');
+    % 
+    %     % Save Hit Response Rate figure
+    %     frame = getframe(figHitResponseRate);
+    %     imwrite(frame.cdata, fullfile(savePath, [name_only,'_HitResponseRate',  '.png']), 'PNG');
+    % end
+    % 
+    % disp(['Figures saved to: ' savePath]);
 
     %% Create combined figure with all plots
     % Create a large figure with multiple subplots containing all plots
@@ -241,16 +246,17 @@ for fileIdx = 1:numFiles
     drawnow;
 
     % Save combined figure
+    output_filename = [subjectStr,'_Combined_',dateTimeStr,'_',protocolStr, '.png'];
     try
-        exportgraphics(figCombined, fullfile(savePath, [name_only,'_Combined', '.png']), ...
+        exportgraphics(figCombined, fullfile(savePath, output_filename), ...
             'Resolution', 300, 'ContentType', 'image');
-        disp(['Combined figure saved to: ' fullfile(savePath, [name_only,'_Combined', '.png'])]);
+        disp(['Combined figure saved to: ' fullfile(savePath, output_filename)]);
     catch
         % Force figure to render before capturing
         drawnow;
         frame = getframe(figCombined);
-        imwrite(frame.cdata, fullfile(savePath, [name_only,'_Combined', '.png']), 'PNG');
-        disp(['Combined figure saved to: ' fullfile(savePath, [name_only,'_Combined', '.png'])]);
+        imwrite(frame.cdata, fullfile(savePath, output_filename), 'PNG');
+        disp(['Combined figure saved to: ' fullfile(savePath, output_filename)]);
     end
 
     % Close figures for current file (optional - comment out if you want to keep them open)
