@@ -97,7 +97,13 @@ function AntiBias()
     outcomePlot.CorrectStateNames = {'LeftReward', 'RightReward'}; % States where correct response was made 
     
     % Initialize trial tracking variables
-    currentSide = 1; % 1 = low frequency side, 2 = high frequency side (spout determined by highFreqSpout/lowFreqSpout configuration)
+    currentSide = randi(2); % randomize between 1 and 2; 1 = low frequency side, 2 = high frequency side (left/right mapping determined by highFreqSpout/lowFreqSpout configuration)
+    switch currentSide
+        case 1
+            disp(['Starting with low frequency side (',spoutNames{lowFreqSpout},').'])
+        case 2
+            disp(['Starting with high frequency side (',spoutNames{highFreqSpout},').'])
+    end
     highFreqIndex = 1; % Index for high frequency table (continuous)
     lowFreqIndex = 1; % Index for low frequency table (continuous)
     
