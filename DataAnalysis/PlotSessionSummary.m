@@ -463,69 +463,12 @@ function PlotSessionSummary(SessionData, varargin)
         
         if leftRewardVisited || rightRewardVisited
             try
-                if isfield(trialData, 'Events')
-                    % Get Port1In events
-                    if isfield(trialData.Events, 'Port1In')
-                        port1InTimes = trialData.Events.Port1In;
-                        if ~isempty(port1InTimes)
-                            % Get trial start time to ensure Port1In is within this trial
-                            trialStartTime = 0; % Trial start is at time 0
-                            
-                            % Get Stimulus state timing to check if Port1In is before or during Stimulus
-                            stimulusStart = NaN;
-                            if isfield(trialData, 'States') && isfield(trialData.States, 'Stimulus')
-                                stimulusStart = trialData.States.Stimulus(1);
-                            end
-                            
-                            % Check if Port1In occurred in this trial (before or during Stimulus state)
-                            if ~isnan(stimulusStart)
-                                % Port1In should be before or at the start of Stimulus state
-                                port1InBeforeOrDuringStimulus = port1InTimes <= stimulusStart;
-                            else
-                                % If Stimulus state doesn't exist, check if Port1In is within reasonable time window
-                                port1InBeforeOrDuringStimulus = port1InTimes >= trialStartTime & port1InTimes <= 10;
-                            end
-                            
-                            if any(port1InBeforeOrDuringStimulus)
-                                % Check if left reward was triggered by Port1
-                                if leftRewardVisited
-                                    try
-                                        leftRewardTime = trialData.States.LeftReward(1);
-                                        if ~isnan(stimulusStart)
-                                            timeFromPort1ToReward = leftRewardTime - port1InTimes;
-                                            if any(timeFromPort1ToReward > 0 & timeFromPort1ToReward < 2 & port1InBeforeOrDuringStimulus)
-                                                isLeftRewardFromPort1 = true;
-                                            end
-                                        else
-                                            timeDiff = abs(port1InTimes - leftRewardTime);
-                                            if any(timeDiff < 2 & port1InBeforeOrDuringStimulus)
-                                                isLeftRewardFromPort1 = true;
-                                            end
-                                        end
-                                    catch
-                                    end
-                                end
-                                
-                                % Check if right reward was triggered by Port1
-                                if rightRewardVisited
-                                    try
-                                        rightRewardTime = trialData.States.RightReward(1);
-                                        if ~isnan(stimulusStart)
-                                            timeFromPort1ToReward = rightRewardTime - port1InTimes;
-                                            if any(timeFromPort1ToReward > 0 & timeFromPort1ToReward < 2 & port1InBeforeOrDuringStimulus)
-                                                isRightRewardFromPort1 = true;
-                                            end
-                                        else
-                                            timeDiff = abs(port1InTimes - rightRewardTime);
-                                            if any(timeDiff < 2 & port1InBeforeOrDuringStimulus)
-                                                isRightRewardFromPort1 = true;
-                                            end
-                                        end
-                                    catch
-                                    end
-                                end
-                            end
-                        end
+                if isfield(trialData.Events, 'Condition6')
+                    if leftRewardVisited
+                        isLeftRewardFromPort1 = true;
+                    end
+                    if rightRewardVisited
+                        isRightRewardFromPort1 = true;
                     end
                 end
             catch
