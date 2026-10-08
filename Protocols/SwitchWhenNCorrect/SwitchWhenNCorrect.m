@@ -88,14 +88,14 @@ function SwitchWhenNCorrect()
     
     %% Initialize plots
     % Initialize the outcome plot with different trial types for left/right spouts
-    trialTypes = ones(1, NumTrials); % Will be updated based on correctSide (1=left, 2=right)
-    outcomePlot = LiveOutcomePlot([1 2], {'Left Spout', 'Right Spout'}, trialTypes, NumTrials); % Create an instance of the LiveOutcomePlot GUI
-    % Arg1 = trialTypeManifest, a list of possible trial types (1=left, 2=right).
-    % Arg2 = trialTypeNames, a list of names for each trial type in trialTypeManifest
-    % Arg3 = trialTypes, a list of integers denoting precomputed trial types in the session
-    % Arg4 = nTrialsToShow, the number of trials to show
-    outcomePlot.RewardStateNames = {'LeftReward', 'RightReward'}; % List of state names where reward was delivered
-    outcomePlot.CorrectStateNames = {'LeftReward', 'RightReward'}; % States where correct response was made 
+    % trialTypes = ones(1, NumTrials); % Will be updated based on correctSide (1=left, 2=right)
+    % outcomePlot = LiveOutcomePlot([1 2], {'Left Spout', 'Right Spout'}, trialTypes, NumTrials); % Create an instance of the LiveOutcomePlot GUI
+    % % Arg1 = trialTypeManifest, a list of possible trial types (1=left, 2=right).
+    % % Arg2 = trialTypeNames, a list of names for each trial type in trialTypeManifest
+    % % Arg3 = trialTypes, a list of integers denoting precomputed trial types in the session
+    % % Arg4 = nTrialsToShow, the number of trials to show
+    % outcomePlot.RewardStateNames = {'LeftReward', 'RightReward'}; % List of state names where reward was delivered
+    % outcomePlot.CorrectStateNames = {'LeftReward', 'RightReward'}; % States where correct response was made 
     
     % Initialize trial tracking variables
     currentSide = randi(2); % randomize between 1 and 2; 1 = low frequency side, 2 = high frequency side (left/right mapping determined by highFreqSpout/lowFreqSpout configuration)
@@ -181,48 +181,49 @@ function SwitchWhenNCorrect()
             updateFlag = false; % reset flag
         end
 
-        % Wait for trigger states (LeftReward, RightReward, WaitToFinish)
-        trialManager.getCurrentEvents({'LeftReward', 'RightReward', 'WaitToFinish'});
-        if BpodSystem.Status.BeingUsed == 0; return; end % If user hit console "stop" button, end session
-
-        % Get trial data
-        RawEvents = trialManager.getTrialData;
-        if BpodSystem.Status.BeingUsed == 0; return; end % If user hit console "stop" button, end session
-
         % Save all trial parameters from S BEFORE processing trial data (to avoid shift)
         % This ensures we save the values that were used for this trial
         % For first trial, S was set at line 147. For subsequent trials, S was set in previous iteration.
-        if ~isempty(fieldnames(RawEvents))
-            BpodSystem.Data.CurrentSide(currentTrial) = currentSide;
-            % Derive correctSide from currentSide using configuration
-            if currentSide == 1  % Low frequency side
-                correctSideForThisTrial = lowFreqSpout;
-            else % High frequency side
-                correctSideForThisTrial = highFreqSpout;
-            end
-            BpodSystem.Data.CorrectSide(currentTrial) = correctSideForThisTrial;
-            % Save all other parameters from S (before S gets updated for next trial)
-            BpodSystem.Data.IsCatchTrial(currentTrial) = S.IsCatchTrial;
-            BpodSystem.Data.CurrentStimRow{currentTrial} = S.CurrentStimRow;
-            BpodSystem.Data.ITIBefore(currentTrial) = S.ITIBefore;
-            BpodSystem.Data.ITIAfter(currentTrial) = S.ITIAfter;
-            BpodSystem.Data.ThisITI(currentTrial) = S.ThisITI;
-            BpodSystem.Data.QuietTime(currentTrial) = S.QuietTime;
-            BpodSystem.Data.TimerDuration(currentTrial) = S.TimerDuration;
-            BpodSystem.Data.RewardAmount(currentTrial) = S.RewardAmount;
-            BpodSystem.Data.ResWin(currentTrial) = S.ResWin;
-            BpodSystem.Data.CutOff(currentTrial) = S.GUI.CutOffPeriod;
+        BpodSystem.Data.CurrentSide(currentTrial) = currentSide;
+        % Derive correctSide from currentSide using configuration
+        if currentSide == 1  % Low frequency side
+            correctSideForThisTrial = lowFreqSpout;
+        else % High frequency side
+            correctSideForThisTrial = highFreqSpout;
         end
+        BpodSystem.Data.CorrectSide(currentTrial) = correctSideForThisTrial;
+        % Save all other parameters from S (before S gets updated for next trial)
+        BpodSystem.Data.IsCatchTrial(currentTrial) = S.IsCatchTrial;
+        BpodSystem.Data.CurrentStimRow{currentTrial} = S.CurrentStimRow;
+        BpodSystem.Data.ITIBefore(currentTrial) = S.ITIBefore;
+        BpodSystem.Data.ITIAfter(currentTrial) = S.ITIAfter;
+        BpodSystem.Data.ThisITI(currentTrial) = S.ThisITI;
+        BpodSystem.Data.QuietTime(currentTrial) = S.QuietTime;
+        BpodSystem.Data.TimerDuration(currentTrial) = S.TimerDuration;
+        BpodSystem.Data.RewardAmount(currentTrial) = S.RewardAmount;
+        BpodSystem.Data.ResWin(currentTrial) = S.ResWin;
+        BpodSystem.Data.CutOff(currentTrial) = S.GUI.CutOffPeriod;
+        BpodSystem.Data.TrialSettings(currentTrial) = S;
         
+        % Add current trial's stimRow to StimTable
+        currentStimRow = BpodSystem.Data.CurrentStimRow{currentTrial};
+        if ~isempty(currentStimRow)
+            if height(BpodSystem.Data.StimTable) == 0
+                % First trial - create table
+                BpodSystem.Data.StimTable = currentStimRow;
+            else
+                % Append to existing table
+                BpodSystem.Data.StimTable = [BpodSystem.Data.StimTable; currentStimRow];
+            end
+        end
+
+        % Wait for trigger states (LeftReward, RightReward, WaitToFinish)
+        currentTrialEvents  = trialManager.getCurrentEvents({'LeftReward', 'RightReward', 'WaitToFinish'});
+        if BpodSystem.Status.BeingUsed == 0; return; end % If user hit console "stop" button, end session
+
         % Process trial data if available
-        if ~isempty(fieldnames(RawEvents))
-            BpodSystem.Data = AddTrialEvents(BpodSystem.Data, RawEvents);
-            BpodSystem.Data.TrialSettings(currentTrial) = S;
+        if ~isempty(fieldnames(currentTrialEvents))
 
-
-            % Save trial timestamp
-            BpodSystem.Data.TrialStartTimestamp(currentTrial) = RawEvents.TrialStartTimestamp;
-            
             % Get current trial parameters from saved data (all were saved earlier to avoid shift)         
             correctSide = BpodSystem.Data.CorrectSide(currentTrial);
             isCatchTrial = BpodSystem.Data.IsCatchTrial(currentTrial);
@@ -230,59 +231,24 @@ function SwitchWhenNCorrect()
             % Note: All trial parameters were already saved earlier (before processing trial data) to avoid shift
             
             % Check if response was correct (only for non-catch trials)
-            if ~isCatchTrial
-                % Check if animal licked correct side and got reward
-                % Need to check if state was actually visited (not just exists as NaN)
-                leftRewardVisited = isfield(BpodSystem.Data.RawEvents.Trial{currentTrial}.States, 'LeftReward') && ...
-                    ~isnan(BpodSystem.Data.RawEvents.Trial{currentTrial}.States.LeftReward(1));
-                rightRewardVisited = isfield(BpodSystem.Data.RawEvents.Trial{currentTrial}.States, 'RightReward') && ...
-                    ~isnan(BpodSystem.Data.RawEvents.Trial{currentTrial}.States.RightReward(1));
-                
-                if leftRewardVisited || rightRewardVisited
-                    % Animal licked correct side and got reward - correct response
-                    isCorrect = true;
-                    correctCount = correctCount + 1;
-                    disp(['Trial ' num2str(currentTrial) ': Correct response! Count: ' num2str(correctCount)]);
-                else
-                    % Animal did not lick correct side - incorrect response
-                    isCorrect = false;
-                    % Do NOT reset counter - keep cumulative count
-                    disp(['Trial ' num2str(currentTrial) ': Incorrect response. Count remains: ' num2str(correctCount)]);
-                end
-            else
+            isCorrect = false; % initialize 
+            if isCatchTrial
                 % Catch trial - no response expected
                 isCorrect = true; % Don't count catch trials
                 disp(['Trial ' num2str(currentTrial) ': Catch trial - no response expected.']);
+            elseif ismember({'Condition6'},currentTrialEvents.EventsCaptured) % manual reward 
+                disp(['Trial ' num2str(currentTrial) ': Manually rewarded']);
+            elseif any(ismember({'LeftReward','RightReward'},currentTrialEvents.StatesVisited))
+                isCorrect = true;
+                disp(['Trial ' num2str(currentTrial) ': Correct response!']);
+            else
+                disp(['Trial ' num2str(currentTrial) ': Miss or incorrect response.']);
             end
 
             % Save response information
             BpodSystem.Data.IsCorrect(currentTrial) = isCorrect;
             BpodSystem.Data.CorrectCount(currentTrial) = correctCount;
-            
-            % Update trial type for outcome plot based on correct side
-            trialTypes(currentTrial) = correctSide; % 1 = left spout, 2 = right spout
-            
-            % Extend trialTypes array to prevent index out of bounds in LiveOutcomePlot
-            % The plot window may extend beyond NumTrials, so we need extra elements
-            % Calculate maximum possible index: currentTrial + nTrialsToShow - 1
-            maxPossibleIndex = currentTrial + outcomePlot.nTrialsToShow - 1;
-            if length(trialTypes) < maxPossibleIndex
-                % Extend array with default value (1 = left spout) for future trials
-                trialTypes(end+1:maxPossibleIndex) = 1;
-            end
-            
-            % Add current trial's stimRow to StimTable
-            currentStimRow = BpodSystem.Data.CurrentStimRow{currentTrial};
-            if ~isempty(currentStimRow)
-                if height(BpodSystem.Data.StimTable) == 0
-                    % First trial - create table
-                    BpodSystem.Data.StimTable = currentStimRow;
-                else
-                    % Append to existing table
-                    BpodSystem.Data.StimTable = [BpodSystem.Data.StimTable; currentStimRow];
-                end
-            end
-            
+                         
             % Check if we need to switch sides
             if correctCount >= S.GUI.NCorrectToSwitch
                 % Switch to the other side
@@ -312,6 +278,10 @@ function SwitchWhenNCorrect()
             SendStateMachine(sma, 'RunASAP'); % Send next trial's state machine during current trial
         end
         
+        % Get trial data
+        RawEvents = trialManager.getTrialData;
+        if BpodSystem.Status.BeingUsed == 0; return; end % If user hit console "stop" button, end session
+
         % Handle pause condition
         HandlePauseCondition;
         
@@ -322,8 +292,12 @@ function SwitchWhenNCorrect()
         
         % Update outcome plot and other visualizations
         if ~isempty(fieldnames(RawEvents))
-            % Update outcome plot
-            outcomePlot.update(trialTypes, BpodSystem.Data);
+            BpodSystem.Data = AddTrialEvents(BpodSystem.Data, RawEvents);
+            % Save trial timestamp
+            BpodSystem.Data.TrialStartTimestamp(currentTrial) = RawEvents.TrialStartTimestamp;
+
+            % % Update outcome plot
+            % outcomePlot.update(trialTypes, BpodSystem.Data);
             
             % Update lick interval, response latency histograms, raster plot, and session summary
             try
