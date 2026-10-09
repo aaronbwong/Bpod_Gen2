@@ -184,7 +184,7 @@ function PlotLickIntervals(SessionData, varargin)
             disp('================================');
         end
     else
-        warning('Not enough lick events to calculate intervals. Need at least 2 licks.');
+%         warning('Not enough lick events to calculate intervals. Need at least 2 licks.');
         cla(ax);
         text(ax, 0.5, 0.5, 'Not enough lick events to calculate intervals', ...
             'HorizontalAlignment', 'center', 'FontSize', 14);

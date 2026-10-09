@@ -160,7 +160,7 @@ function PlotResLatency(SessionData, varargin)
             disp('===================================');
         end
     else
-        warning('No response latencies found. Need at least one lick after stimulus start.');
+%         warning('No response latencies found. Need at least one lick after stimulus start.');
         cla(ax);
         text(ax, 0.5, 0.5, 'No response latencies available', ...
             'HorizontalAlignment', 'center', 'FontSize', 14);
