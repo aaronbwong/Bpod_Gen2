@@ -3,6 +3,9 @@
 function SwitchWhenNCorrect()
     global BpodSystem
 
+    figurePosition = [20 50 1200 480];
+    ParameterGUILocation = [840, 650];
+
     %% Session Setup
 
     % Create trial manager object
@@ -62,7 +65,8 @@ function SwitchWhenNCorrect()
 
     % Initialize parameter GUI
     BpodParameterGUI('init', S);
-    
+    BpodSystem.ProtocolFigures.ParameterGUI.Position(1:2) = ParameterGUILocation;
+
     % Create update button
     uicontrol('Style', 'pushbutton', ...
         'String', 'Update Parameters', ...
@@ -137,7 +141,7 @@ function SwitchWhenNCorrect()
     BpodSystem.Data.CurrentStimRow = cell(1, NumTrials);
     
     %% Initialize custom figure for lick interval, response latency histograms, raster plot, and session summary
-    customPlotFig = figure('Name', 'Behavior Analysis', 'Position', [100 100 1500 480]);
+    customPlotFig = figure('Name', 'Behavior Analysis', 'Position', figurePosition);
     % Upper left subplot for lick intervals
     lickIntervalAx = subplot(2, 3, 1);
     title(lickIntervalAx, 'Lick Intervals Distribution');
@@ -272,6 +276,8 @@ function SwitchWhenNCorrect()
             end
         end
         
+        disp(['==========================']);
+
         % Prepare next trial's state machine if not the last trial
         if currentTrial < NumTrials
             [sma, S] = PrepareStateMachine(S, LeftRightSeq, CalTable, H, currentSide, highFreqIndex, lowFreqIndex, correctCount, CutOffPeriod, StimDur, highFreqSpout, lowFreqSpout, Ramp, catchTrialSequence(currentTrial + 1));
@@ -400,23 +406,27 @@ function [sma, S] = PrepareStateMachine(S, LeftRightSeq, CalTable, H, currentSid
 
     % Display trial info with configuration
     spoutNames = {'left', 'right'};
+    for k = 1:2
+        fprintf('%s: %g\t', currentStimRow.Properties.VariableNames{k}, currentStimRow{1,k});
+    end
     if currentSide == 1
         sideName = 'low freq';
     else
         sideName = 'high freq';
     end
-    disp(['Current side = ' num2str(currentSide) ' (' sideName '), Correct side = ' num2str(correctSide) ' (' spoutNames{correctSide} ')']);
-    if currentSide == 1
-        disp(['Low freq index: ' num2str(lowFreqIndex)]);
-    else
-        disp(['High freq index: ' num2str(highFreqIndex)]);
-    end
-    disp(currentStimRow);
+    fprintf('Current side: %d(%s, %s)\n', currentSide, sideName, spoutNames{correctSide});
+%     disp(['Current side = ' num2str(currentSide) ' (' sideName '), Correct side = ' num2str(correctSide) ' (' spoutNames{correctSide} ')']);
+%     if currentSide == 1
+%         disp(['Low freq index: ' num2str(lowFreqIndex)]);
+%     else
+%         disp(['High freq index: ' num2str(highFreqIndex)]);
+%     end
+%     disp(currentStimRow);
 
     % Load the sound wave into BpodHiFi
     H.load(1, soundWave); 
     H.push();
-    disp('Sound loaded to buffer 1');
+%     disp('Sound loaded to buffer 1');
 
 
     % Generate random ITI and quiet time for this trial
