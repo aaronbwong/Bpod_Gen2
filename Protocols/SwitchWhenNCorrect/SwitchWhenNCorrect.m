@@ -248,6 +248,7 @@ function SwitchWhenNCorrect()
             else
                 disp(['Trial ' num2str(currentTrial) ': Miss or incorrect response.']);
             end
+            if isCorrect && ~isCatchTrial; correctCount = correctCount + 1; end
 
             % Save response information
             BpodSystem.Data.IsCorrect(currentTrial) = isCorrect;
