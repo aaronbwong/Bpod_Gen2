@@ -12,66 +12,53 @@ function nextTrialSide = PickSideAntiBias(SessionData)
    
     % If there are less than 2 * runningAvg trials, set probability to 0.5
     % and choose randomly, but not more than maxConsec consecutive same side trials
-    totalTrials = length(SessionData.RawEvents.Trial);
-    if totalTrials < 2 * runningAvg
-        % Check if last maxConsec trials have the same side
-        if totalTrials >= maxConsec
-            recentSides = SessionData.CorrectSide((totalTrials - maxConsec + 1):totalTrials);
-            % Check if all recent sides are the same
-            if all(recentSides == recentSides(1))
-                % Force switch to opposite side
-                nextTrialSide = 3 - recentSides(1);
-                return;
-            end
+    totalTrials = length(SessionData.CorrectSide);
+
+    %% 1: Check maxConsec condition ============
+    if totalTrials >= maxConsec
+        recentSides = SessionData.CorrectSide((totalTrials - maxConsec + 1):totalTrials);
+        % Check if all recent sides are the same
+        if all(recentSides == recentSides(1))
+            % Force switch to opposite side
+            nextTrialSide = 3 - recentSides(1);
+            return;
         end
+    end
+
+    %% 2: Check enough for running average ===============
+    if totalTrials < 2 * runningAvg
+        % BUG: catch trials are now included here.
         % Choose randomly if not maxConsec consecutive same side
         probL = 0.5;
         nextTrialSide = 2 - (rand() < probL);
         return;
     end
 
-    % Check if last 5 trials have the same side after 2 * runningAvg trials
-    % This is to avoid getting stuck on the same side for too long
-    recentSides = SessionData.CorrectSide((totalTrials - 5 + 1):totalTrials);
-    % Check if all recent sides are the same
-    if all(recentSides == recentSides(1))
-        % Force switch to opposite side
-        nextTrialSide = 3 - recentSides(1);
-        return;
+    %% 3: Calculate Hit Rates and Pick a side
+
+    % Determine if trials are correct, if not already done in protocol.
+    if ~isfield(SessionData,'IsCorrect')
+        SessionData.IsCorrect = nan(1,totalTrials);
+        for trialNum = 1:totalTrials
+            SessionData.IsCorrect(trialNum) = checkCorrect(SessionData,trialNum);
+        end
     end
-    
+
     % After 2 * runningAvg trials, calculate the probability of selecting left spout based on anti-bias logic
-    trialIdx = 1:totalTrials;
-    leftNonCatchTrials = find(SessionData.CorrectSide(trialIdx) == 1 & ~SessionData.IsCatchTrial(trialIdx),...
+    leftNonCatchTrials = find(SessionData.CorrectSide(:) == 1 & ~SessionData.IsCatchTrial(:),...
                                runningAvg, 'last');
-    rightNonCatchTrials = find(SessionData.CorrectSide(trialIdx) == 2 & ~SessionData.IsCatchTrial(trialIdx),...
+    rightNonCatchTrials = find(SessionData.CorrectSide(:) == 2 & ~SessionData.IsCatchTrial(:),...
                                runningAvg, 'last');
     % StartTrialNum = max(1, totalTrials - runningAvg + 1); % Ensure StartTrialNum >= 1
 
     % Loop through recent Left trials (last runningAvg trials)
     NumLeftNonCatchTrials = length(leftNonCatchTrials);
-    rewarded = nan(1,NumLeftNonCatchTrials);
-    triggered = nan(1,NumLeftNonCatchTrials);
-    for trialNum = 1:NumLeftNonCatchTrials
-        % Get trial data
-        trialData = SessionData.RawEvents.Trial{leftNonCatchTrials(trialNum)};
-        rewarded(trialNum) = any(~isnan([trialData.States.LeftReward,trialData.States.RightReward]));
-        triggered(trialNum) = isTriggered(trialData);
-    end
-    leftHits = sum(rewarded & ~triggered);
+    leftHits = sum(SessionData.IsCorrect(leftNonCatchTrials));
     leftHitRate = leftHits / NumLeftNonCatchTrials;
 
     % Loop through recent Right trials (last runningAvg trials)
     NumRightNonCatchTrials = length(rightNonCatchTrials);
-    rewarded = nan(1,NumRightNonCatchTrials);
-    triggered = nan(1,NumRightNonCatchTrials);
-    for trialNum = 1:NumRightNonCatchTrials
-        % Get trial data
-        trialData = SessionData.RawEvents.Trial{rightNonCatchTrials(trialNum)};
-        rewarded(trialNum) = any(~isnan([trialData.States.LeftReward,trialData.States.RightReward]));
-        triggered(trialNum) = isTriggered(trialData);
-    end
-    rightHits = sum(rewarded & ~triggered);
+    rightHits = sum(SessionData.IsCorrect(rightNonCatchTrials));
     rightHitRate = rightHits / NumRightNonCatchTrials;
 
     % Calculate probability of selecting left spout based on anti-bias logic
@@ -99,4 +86,23 @@ function triggered = isTriggered(trialData)
     else
         triggered = false;
     end
+end
+
+function isCorrect = checkCorrect(SessionData, currentTrial)
+    isCorrect = false;
+    if SessionData.IsCatchTrial(currentTrial)
+        % catch trials (always correct?)
+        isCorrect = true; % Catch trials are excluded from response scoring
+    elseif ismember({'Condition6'}, fieldnames(SessionData.RawEvents.Trial{currentTrial}.Events))
+        % manual reward
+    elseif any(ismember({'LeftReward', 'RightReward'}, fieldnames(SessionData.RawEvents.Trial{currentTrial}.States)))
+        if any(~isnan(SessionData.RawEvents.Trial{currentTrial}.States.LeftReward)) || ...
+                any(~isnan(SessionData.RawEvents.Trial{currentTrial}.States.RightReward)) 
+            % rewarded i.e. correct
+            isCorrect = true;
+        end
+    else
+        % miss
+    end
+
 end
