@@ -421,6 +421,14 @@ function closeGUI(fig)
     catch
         % Ignore errors
     end
+    try
+        data = guidata(fig);
+        delete(data.HiFiModule)
+        disp('HiFiModule "disconnected".')
+    catch
+        disp('HiFiModule disconnection failed.')
+        % Ignore errors
+    end
     delete(fig);
 end
 
