@@ -3,7 +3,7 @@
 function AntiBias()
     global BpodSystem
 
-    figurePosition = [20 50 1200 480];
+    figurePosition = [20 -230 1200 800];
     ParameterGUILocation = [840, 650];
 
     %% Session Setup

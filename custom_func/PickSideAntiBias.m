@@ -27,6 +27,7 @@ function nextTrialSide = PickSideAntiBias(SessionData)
 
     %% 2: Check enough for running average ===============
     if totalTrials < 2 * runningAvg
+        % BUG: catch trials are now included here.
         % Choose randomly if not maxConsec consecutive same side
         probL = 0.5;
         nextTrialSide = 2 - (rand() < probL);
