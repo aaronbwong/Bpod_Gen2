@@ -166,6 +166,7 @@ function Categorization()
     BpodSystem.ProtocolFigures.CustomPlotFig = customPlotFig;
 
     % Prepare and start first trial
+    fprintf('=========== Trial %d ===========\n',1);
     [sma, S, updateFlag] = PrepareStateMachine(S, 1, updateFlag, StimTable, CalTable, H, Ramp);
     trialManager.startTrial(sma);
 
@@ -208,7 +209,8 @@ function Categorization()
         % if BpodSystem.Status.BeingUsed == 0; return; end % If user hit console "stop" button, end session
 
          % Determine next side based on trial number (BEFORE preparing next trial's state machine)
-        if currentTrial < NumTrials
+        if currentTrial < NumTrials            
+            fprintf('=========== Trial %d ===========\n',currentTrial+1);
             % Prepare next trial's state machine
             [sma, S, updateFlag] = PrepareStateMachine(S, currentTrial+1, updateFlag, StimTable, CalTable, H, Ramp);
             
@@ -271,13 +273,14 @@ function Categorization()
         soundWave = GenStimWave(currentStimRow, CalTable);
         soundWave = ApplySinRamp(soundWave, Ramp, H.SamplingRate);
         
-        % Display trial info
-        disp(currentStimRow);
+        % Display trial info with configuration
+        for k = 1:2
+            fprintf('%s: %g\t', currentStimRow.Properties.VariableNames{k}, currentStimRow{1,k});
+        end
         
         % Load the sound wave into BpodHiFi
         H.load(1, soundWave);
         H.push();
-        disp(['Trial ' num2str(currentTrial) ': Sound loaded to buffer 1']);
 
         % Generate random ITI and quiet time for this trial
         ITIBefore = S.GUI.MinITI/2;
