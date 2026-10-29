@@ -4,6 +4,9 @@
 function Categorization()
     global BpodSystem
 
+    figurePosition = [20 -230 1200 800];
+    ParameterGUILocation = [840, 650];
+
     % Create trial manager object
     trialManager = BpodTrialManager;
 
@@ -40,16 +43,15 @@ function Categorization()
     S.GUI.MaxQuietTime = StimParams.Behave.MaxQuietTime; % seconds
     S.GUI.RewardAmount = StimParams.Behave.RewardAmount; % µL
     S.GUI.ResWin = StimParams.Behave.ResWin; % seconds
-
-    % Cut-off period for NoLick state
-    CutOffPeriod = 60; % seconds
+    S.GUI.CutOffPeriod = 60; % seconds
 
     % Initialize parameter GUI
     BpodParameterGUI('init', S);
+    BpodSystem.ProtocolFigures.ParameterGUI.Position(1:2) = ParameterGUILocation;
     % Create update button
     uicontrol('Style', 'pushbutton', ...
         'String', 'Update Parameters', ...
-        'Position', [160 240 150 30], ...  % [left bottom width height]
+        'Position', [250 310 150 30], ...  % [left bottom width height]
         'FontSize', 12, ...
         'Callback', @updateParams);
 
@@ -94,7 +96,7 @@ function Categorization()
     % Row 1: PlotLickIntervals, PlotResLatency, PlotLickRaster
     % Row 2: PlotSessionSummary, PlotCDFHitRate, PlotBarResponse
     % Row 3: PlotHitResponseRate (centered), empty, empty
-    customPlotFig = figure('Name', 'Behavior Analysis', 'Position', [100, 100, 1500, 800]);
+    customPlotFig = figure('Name', 'Behavior Analysis', 'Position', figurePosition);
     
     % Subplot 1: Session Summary (1,1) - left column, spans 2 rows
     summaryAx = subplot(3, 3, [1,4]);
@@ -292,7 +294,7 @@ function Categorization()
         TimerDuration = ITIAfter + StimDur; % GlobalTimer2 covers stimulus + ITI after
         RewardAmount = S.GUI.RewardAmount;
         ResWin = S.GUI.ResWin;
-        CutOff = CutOffPeriod;
+        CutOff = S.GUI.CutOffPeriod;
 
         % Get valve times
         ValveTimes = BpodLiquidCalibration('GetValveTimes', RewardAmount, [1 2]);

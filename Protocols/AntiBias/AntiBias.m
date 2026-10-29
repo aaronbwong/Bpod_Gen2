@@ -423,7 +423,7 @@ function [sma, S] = PrepareStateMachine(S, LeftRightSeq, CalTable, H, currentSid
     LeftValveTime = ValveTimes(1);
     RightValveTime = ValveTimes(2);
     ResWin = S.GUI.ResWin;
-    CutOff = CutOffPeriod;
+    CutOff = S.GUI.CutOffPeriod; % S was synced with the GUI at the top of this function
     
     % Convert CorrectSide to response direction
     if correctSide == 1

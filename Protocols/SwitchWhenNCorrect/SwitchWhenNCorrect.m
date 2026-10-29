@@ -59,9 +59,10 @@ function SwitchWhenNCorrect()
     S.GUI.MaxQuietTime = StimParams.Behave.MaxQuietTime; % seconds
     S.GUI.RewardAmount = StimParams.Behave.RewardAmount; % µL
     S.GUI.ResWin = StimParams.Behave.ResWin; % seconds
-    S.GUI.NCorrectToSwitch = 7; % Number of correct trials needed to switch sides
     S.GUI.CutOffPeriod = 60; % seconds
     CutOffPeriod = S.GUI.CutOffPeriod;
+    % Protocol-specific parameter (controls side switching; not present in other protocols)
+    S.GUI.NCorrectToSwitch = 7; % Number of correct trials needed to switch sides
 
     % Initialize parameter GUI
     BpodParameterGUI('init', S);
@@ -443,7 +444,7 @@ function [sma, S] = PrepareStateMachine(S, LeftRightSeq, CalTable, H, currentSid
     LeftValveTime = ValveTimes(1);
     RightValveTime = ValveTimes(2);
     ResWin = S.GUI.ResWin;
-    CutOff = CutOffPeriod;
+    CutOff = S.GUI.CutOffPeriod; % S was synced with the GUI at the top of this function
     
     % Convert CorrectSide to response direction
     if correctSide == 1
