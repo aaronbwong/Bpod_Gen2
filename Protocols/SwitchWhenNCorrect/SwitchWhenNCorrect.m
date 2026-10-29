@@ -375,8 +375,8 @@ function [sma, S] = PrepareStateMachine(S, LeftRightSeq, CalTable, H, currentSid
     % Prepare state machine for the current trial
 
 
-    % Sync parameters with GUI
-    S = BpodParameterGUI('sync', S);
+    % GUI values are synced only in the main loop when the Update button was pressed
+    
     
     % If catch trial, use CatchTrialTable
     if isCatchTrial
@@ -444,7 +444,7 @@ function [sma, S] = PrepareStateMachine(S, LeftRightSeq, CalTable, H, currentSid
     LeftValveTime = ValveTimes(1);
     RightValveTime = ValveTimes(2);
     ResWin = S.GUI.ResWin;
-    CutOff = S.GUI.CutOffPeriod; % S was synced with the GUI at the top of this function
+    CutOff = S.GUI.CutOffPeriod;
     
     % Convert CorrectSide to response direction
     if correctSide == 1
