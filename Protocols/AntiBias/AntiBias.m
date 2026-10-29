@@ -519,7 +519,7 @@ function [sma, S] = PrepareStateMachine(S, LeftRightSeq, CalTable, H, currentSid
         sma = AddState(sma, 'Name', 'Stimulus', ...
             'Timer', ResWin, ... % "Response window"
             'StateChangeConditions', {'Tup', 'WaitToFinish'}, ...
-            'OutputActions', {'GlobalTimerTrig', 2});
+            'OutputActions', {'HiFi1', ['P' playSlot-1],'GlobalTimerTrig', 2});
     else
         % Regular trial - stimulus plays until correct lick
         if strcmp(correctResponse, 'left')

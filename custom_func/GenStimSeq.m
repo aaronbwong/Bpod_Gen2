@@ -582,6 +582,11 @@ function StimTable = addCatchTrials(StimTable, nTrials, propCatch)
             catchTrial.CorrectSide = 1; % Default to low frequency for catch trials (VibFreq = 0)
         elseif strcmp(catchTrial.Properties.VariableNames{i}, 'Rewarded')
             catchTrial.Rewarded = 0; % Catch trials are never rewarded
+        elseif strcmp(catchTrial.Properties.VariableNames{i}, 'MMType')
+            catchTrial.MMType = {'OO'}; % No sound, no vibration -> GenStimWave returns zeros
+        elseif any(strcmp(catchTrial.Properties.VariableNames{i}, {'Duration', 'RampDur'})) && height(StimTable) > 0
+            % Keep the nominal stimulus length so the silent waveform lasts as long as a real one
+            catchTrial.(catchTrial.Properties.VariableNames{i}) = StimTable.(catchTrial.Properties.VariableNames{i})(1);
         end
     end
     
