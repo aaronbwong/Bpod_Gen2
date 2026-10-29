@@ -218,7 +218,7 @@ function AntiBias()
     %% Prepare and start first trial
     % Use catchTrialSequence(1) for the first trial
     fprintf('=========== Trial %d ===========\n',1);
-    [sma, S] = PrepareStateMachine(S, LeftRightSeq, CalTable, H, currentSide, highFreqIndex, lowFreqIndex, 0, CutOffPeriod, StimDur, highFreqSpout, lowFreqSpout, Ramp, catchTrialSequence(1));
+    [sma, S] = PrepareStateMachine(S, LeftRightSeq, CalTable, H, currentSide, highFreqIndex, lowFreqIndex, 0, CutOffPeriod, StimDur, highFreqSpout, lowFreqSpout, Ramp, catchTrialSequence(1), 1);
     trialManager.startTrial(sma);
     
     %% Main loop, runs once per trial
@@ -308,7 +308,7 @@ function AntiBias()
             fprintf('=========== Trial %d ===========\n',currentTrial+1);
 
             % Prepare next trial's state machine (using the updated currentSide)
-            [sma, S] = PrepareStateMachine(S, LeftRightSeq, CalTable, H, currentSide, highFreqIndex, lowFreqIndex, 0, CutOffPeriod, StimDur, highFreqSpout, lowFreqSpout, Ramp, catchTrialSequence(currentTrial + 1));
+            [sma, S] = PrepareStateMachine(S, LeftRightSeq, CalTable, H, currentSide, highFreqIndex, lowFreqIndex, 0, CutOffPeriod, StimDur, highFreqSpout, lowFreqSpout, Ramp, catchTrialSequence(currentTrial + 1), currentTrial + 1);
             SendStateMachine(sma, 'RunASAP'); % Send next trial's state machine during current trial
         end
         
@@ -359,7 +359,7 @@ function AntiBias()
     SaveBpodSessionData;
 end
 
-function [sma, S] = PrepareStateMachine(S, LeftRightSeq, CalTable, H, currentSide, highFreqIndex, lowFreqIndex, ~, CutOffPeriod, StimDur, highFreqSpout, lowFreqSpout, Ramp, isCatchTrial)
+function [sma, S] = PrepareStateMachine(S, LeftRightSeq, CalTable, H, currentSide, highFreqIndex, lowFreqIndex, ~, CutOffPeriod, StimDur, highFreqSpout, lowFreqSpout, Ramp, isCatchTrial, trialNum)
     % Prepare state machine for the current trial
     % Input:
     %   isCatchTrial - boolean indicating if this is a catch trial
@@ -406,7 +406,9 @@ function [sma, S] = PrepareStateMachine(S, LeftRightSeq, CalTable, H, currentSid
     fprintf('Current side: %d(%s, %s)\n', currentSide, sideName, spoutNames{correctSide});
 
     % Load the sound wave into BpodHiFi
-    H.load(1, soundWave); 
+    % Alternate between two HiFi buffers so loading the next trial never overwrites a sound still playing
+    playSlot = 1 + mod(trialNum - 1, 2);
+    H.load(playSlot, soundWave);
     H.push();
 
     % Generate random ITI and quiet time for this trial
@@ -525,19 +527,19 @@ function [sma, S] = PrepareStateMachine(S, LeftRightSeq, CalTable, H, currentSid
             sma = AddState(sma, 'Name', 'Stimulus', ...
                 'Timer', ResWin, ... % Response window
                 'StateChangeConditions', {'BNC1High', 'LeftReward', 'BNC2High', 'WaitToFinish', 'Tup', 'WaitToFinish','Condition6', 'LeftReward'}, ...
-                'OutputActions', {'HiFi1', ['P' 0],'GlobalTimerTrig', 2});
+                                'OutputActions', {'HiFi1', ['P' playSlot-1],'GlobalTimerTrig', 2});
         elseif strcmp(correctResponse, 'right')
             % Right is correct - only respond to right lick (BNC2High)
             sma = AddState(sma, 'Name', 'Stimulus', ...
                 'Timer', ResWin, ... 
                 'StateChangeConditions', {'BNC1High', 'WaitToFinish', 'BNC2High', 'RightReward', 'Tup', 'WaitToFinish','Condition6', 'RightReward'}, ...
-                'OutputActions', {'HiFi1', ['P' 0],'GlobalTimerTrig', 2});
+                                'OutputActions', {'HiFi1', ['P' playSlot-1],'GlobalTimerTrig', 2});
         elseif strcmp(correctResponse, 'boundary')
             % Boundary frequency - both sides are correct
             sma = AddState(sma, 'Name', 'Stimulus', ...
                 'Timer', ResWin, ... 
                 'StateChangeConditions', {'BNC1High', 'LeftReward', 'BNC2High', 'RightReward', 'Tup', 'WaitToFinish'}, ...
-                'OutputActions', {'HiFi1', ['P' 0],'GlobalTimerTrig', 2});
+                                'OutputActions', {'HiFi1', ['P' playSlot-1],'GlobalTimerTrig', 2});
         end
     end
     

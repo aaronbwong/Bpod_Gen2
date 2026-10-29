@@ -205,7 +205,7 @@ function Categorization()
         end
 
         % % Wait for trigger states (LeftReward, RightReward, WaitToFinish)
-        % trialManager.getCurrentEvents({'LeftReward', 'RightReward', 'WaitToFinish'});
+        trialManager.getCurrentEvents({'LeftReward', 'RightReward', 'WaitToFinish'});
         % if BpodSystem.Status.BeingUsed == 0; return; end % If user hit console "stop" button, end session
 
          % Determine next side based on trial number (BEFORE preparing next trial's state machine)
@@ -279,7 +279,9 @@ function Categorization()
         end
         
         % Load the sound wave into BpodHiFi
-        H.load(1, soundWave);
+        % Alternate between two HiFi buffers so loading the next trial never overwrites a sound still playing
+        playSlot = 1 + mod(currentTrial - 1, 2);
+        H.load(playSlot, soundWave);
         H.push();
 
         % Generate random ITI and quiet time for this trial
@@ -393,7 +395,7 @@ function Categorization()
             sma = AddState(sma, 'Name', 'Stimulus', ...
                 'Timer', ResWin, ... % "Response window"
                 'StateChangeConditions', {'Tup', 'WaitToFinish'}, ...
-                'OutputActions', {'HiFi1', ['P' 0],'GlobalTimerTrig', 2});
+                                'OutputActions', {'HiFi1', ['P' playSlot-1],'GlobalTimerTrig', 2});
         else
             % Regular trial - stimulus plays until correct lick
             if strcmp(correctResponse, 'left')
@@ -401,19 +403,19 @@ function Categorization()
                 sma = AddState(sma, 'Name', 'Stimulus', ...
                     'Timer', ResWin, ... % Response window
                     'StateChangeConditions', {'BNC1High', 'LeftReward', 'BNC2High', 'WaitToFinish', 'Tup', 'WaitToFinish','Condition6', 'LeftReward'}, ...
-                    'OutputActions', {'HiFi1', ['P' 0],'GlobalTimerTrig', 2});
+                                        'OutputActions', {'HiFi1', ['P' playSlot-1],'GlobalTimerTrig', 2});
             elseif strcmp(correctResponse, 'right')
                 % Right is correct - only respond to right lick (BNC2High)
                 sma = AddState(sma, 'Name', 'Stimulus', ...
                     'Timer', ResWin, ... 
                     'StateChangeConditions', {'BNC1High', 'WaitToFinish', 'BNC2High', 'RightReward', 'Tup', 'WaitToFinish','Condition6', 'RightReward'}, ...
-                    'OutputActions', {'HiFi1', ['P' 0],'GlobalTimerTrig', 2});
+                                        'OutputActions', {'HiFi1', ['P' playSlot-1],'GlobalTimerTrig', 2});
             elseif strcmp(correctResponse, 'boundary')
                 % Boundary frequency - both sides are correct
                 sma = AddState(sma, 'Name', 'Stimulus', ...
                     'Timer', ResWin, ... 
                     'StateChangeConditions', {'BNC1High', 'LeftReward', 'BNC2High', 'RightReward', 'Tup', 'WaitToFinish'}, ...
-                    'OutputActions', {'HiFi1', ['P' 0],'GlobalTimerTrig', 2});
+                                        'OutputActions', {'HiFi1', ['P' playSlot-1],'GlobalTimerTrig', 2});
             end
         end
         
