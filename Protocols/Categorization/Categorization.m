@@ -73,6 +73,7 @@ function Categorization()
     
     % Initialize data arrays
     BpodSystem.Data.CorrectSide = [];
+    BpodSystem.Data.IsCorrect = [];
     BpodSystem.Data.IsCatchTrial = [];
     BpodSystem.Data.ITIBefore = [];
     BpodSystem.Data.ITIAfter = [];
@@ -207,10 +208,25 @@ function Categorization()
         end
 
         % % Wait for trigger states (LeftReward, RightReward, WaitToFinish)
-        trialManager.getCurrentEvents({'LeftReward', 'RightReward', 'WaitToFinish'});
-        % if BpodSystem.Status.BeingUsed == 0; return; end % If user hit console "stop" button, end session
+        currentTrialEvents = trialManager.getCurrentEvents({'LeftReward', 'RightReward', 'WaitToFinish'});
+        if BpodSystem.Status.BeingUsed == 0; return; end % If user hit console "stop" button, end session
 
-         % Determine next side based on trial number (BEFORE preparing next trial's state machine)
+        % Check trial outcome from the captured events
+        isCorrect = false;
+        if BpodSystem.Data.IsCatchTrial(currentTrial)
+            isCorrect = true; % Catch trials are excluded from response scoring
+            disp(['Trial ' num2str(currentTrial) ': Catch trial - no response expected.']);
+        elseif ismember({'Condition6'}, currentTrialEvents.EventsCaptured)
+            disp(['Trial ' num2str(currentTrial) ': Manually rewarded']);
+        elseif any(ismember({'LeftReward', 'RightReward'}, currentTrialEvents.StatesVisited))
+            isCorrect = true;
+            disp(['Trial ' num2str(currentTrial) ': Correct response!']);
+        else
+            disp(['Trial ' num2str(currentTrial) ': Miss or incorrect response.']);
+        end
+        BpodSystem.Data.IsCorrect(currentTrial) = isCorrect;
+
+        % Determine next side based on trial number (BEFORE preparing next trial's state machine)
         if currentTrial < NumTrials            
             fprintf('=========== Trial %d ===========\n',currentTrial+1);
             % Prepare next trial's state machine
@@ -279,6 +295,7 @@ function Categorization()
         for k = 1:2
             fprintf('%s: %g\t', currentStimRow.Properties.VariableNames{k}, currentStimRow{1,k});
         end
+        fprintf('\n');
         
         % Load the sound wave into BpodHiFi
         % Alternate between two HiFi buffers so loading the next trial never overwrites a sound still playing
