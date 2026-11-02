@@ -24,6 +24,11 @@ multi_session.plotResponseLatencyCDFByAnimal(T,'BoundaryFreq',250);
 
 % Most recent session lick interval histograms by animal
 multi_session.plotLickIntervalsByAnimal(sl);
+%% Psychometric functions pooled across sessions, by animal
+multi_session.plotPsychometricByAnimal(T,'Type','amplitude');
+multi_session.plotPsychometricByAnimal(T,'Type','frequency','BoundaryFreq',250);
+    % last 14 days only
+multi_session.plotPsychometricByAnimal(T,'Type','amplitude','PeriodDays',14);
 %% additional examples
     % last session
 multi_session.plotLatestResponseByAnimal(T,'PeriodDays',1);
