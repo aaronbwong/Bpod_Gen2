@@ -16,6 +16,24 @@ save(fullfile(DEFAULT_OUTPUT_FOLDER,folderName,fileName),'sl','T','animals','nAn
 folderName = 'resultsY006-Y013';fileName = 'resultsY006-Y013_20260616.mat';
 folderName = 'resultsY001-Y004';fileName = 'resultsY001-Y004_20260616.mat';
 load(fullfile(DEFAULT_OUTPUT_FOLDER,folderName,fileName),'sl','T','animals','nAnimals');
+%% append other
+folderNameList{1} = fullfile(replace(DEFAULT_OUTPUT_FOLDER,'Kalix','Yudi'), 'resultsY001-Y004'); fileNameList{1} = 'resultsY001-Y004_20261104.mat';
+folderNameList{2} = fullfile(replace(DEFAULT_OUTPUT_FOLDER,'Kalix','Yudi'), 'resultsY006-Y013'); fileNameList{2} = 'resultsY006-Y013_20261104.mat';
+folderNameList{3} = fullfile(DEFAULT_OUTPUT_FOLDER,'resultsK015-K017'); fileNameList{3} = 'resultsK015-K017_20261104.mat';
+for i_file = 1:length(folderNameList)
+    appendBatch = load(fullfile(folderNameList{i_file},fileNameList{i_file}),'sl','T','animals','nAnimals');
+    if exist('sl', 'var')
+        sl = [sl;appendBatch.sl];
+        T = [T;appendBatch.T];
+        animals = [animals;appendBatch.animals];
+        nAnimals = nAnimals + appendBatch.nAnimals;
+    else
+        sl = [appendBatch.sl];
+        T = [appendBatch.T];
+        animals = [appendBatch.animals];
+        nAnimals =  appendBatch.nAnimals;
+    end
+end
 %% Plotting
 % Hit Rate Barplots by animal
 multi_session.plotLatestResponseByAnimal(T);
@@ -26,7 +44,7 @@ multi_session.plotResponseLatencyCDFByAnimal(T,'BoundaryFreq',250);
 multi_session.plotLickIntervalsByAnimal(sl);
 %% Psychometric functions pooled across sessions, by animal
 multi_session.plotPsychometricByAnimal(T,'Type','amplitude');
-multi_session.plotPsychometricByAnimal(T,'Type','frequency','BoundaryFreq',250);
+multi_session.plotPsychometricByAnimal(T,'Type','frequency','BoundaryFreq',250,'PeriodDays',14);
     % last 14 days only
 multi_session.plotPsychometricByAnimal(T,'Type','amplitude','PeriodDays',14);
 %% additional examples

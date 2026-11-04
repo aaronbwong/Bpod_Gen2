@@ -9,8 +9,12 @@ function [psychTable, fitTable] = plotPsychometricByAnimal(T, varargin)
 %   'Type'          'amplitude' (default): response rate = (L+R)/N vs amplitude,
 %                   one curve per frequency; catch trials (VibFreq == 0) are
 %                   drawn as amplitude 0 on every curve.
-%                   'frequency': right-choice rate = R/(L+R) vs frequency,
-%                   one curve per amplitude; catch trials are excluded.
+%                   'frequency': rate of choosing the spout rewarded for high
+%                   frequencies, H/(L+R), vs frequency (using the per-session
+%                   HighFreqSide 'left'/'right' from SessionData.StimParams.Behave,
+%                   default right). Individual amplitudes are
+%                   shown as unconnected points with a thick connected
+%                   average per frequency on top; no legend; catch trials are excluded.
 %   'Fit'           Weibull fit (binomial likelihood) for 'amplitude' type.
 %                   Default true. Ignored for 'frequency'.
 %   'BoundaryFreq'  Draw category boundary on 'frequency' plots. Default [].
@@ -23,6 +27,11 @@ function [psychTable, fitTable] = plotPsychometricByAnimal(T, varargin)
 %                   'animal': one subplot per animal, one line per condition.
 %                   Default 'condition' for 'amplitude', 'animal' for 'frequency'.
 %   'Plot'          Default true.
+%   'LinkAxes'      Link the x-axes of all panels for the 'frequency' type.
+%                   Default true; set false for independent x-axes.
+%   'PoolAnimals'   'frequency' type: draw all animals on a single panel, one
+%                   connected line per animal (its rate per frequency, pooled
+%                   over amplitudes, with a legend). Default false.
 %   'SessionNumber','SessionDate','PeriodDays'  Session selection passed to
 %                   multi_session.selectSessionsByAnimal. Without any of
 %                   them all sessions are used.
@@ -40,6 +49,8 @@ addParameter(p, 'Animals', {}, @(x) ischar(x) || isstring(x) || iscellstr(x));
 addParameter(p, 'Frequencies', [], @isnumeric);
 addParameter(p, 'PanelBy', '', @(x) isempty(x) || any(strcmpi(x, {'condition','animal'})));
 addParameter(p, 'Plot', true, @(x) islogical(x) || isnumeric(x));
+addParameter(p, 'LinkAxes', true, @(x) islogical(x) || isnumeric(x));
+addParameter(p, 'PoolAnimals', false, @(x) islogical(x) || isnumeric(x));
 addParameter(p, 'SessionNumber', [], @(x) isempty(x) || isscalar(x));
 addParameter(p, 'SessionDate', [], @(x) isempty(x) || isdatetime(x) || ischar(x) || isstring(x));
 addParameter(p, 'PeriodDays', [], @(x) isempty(x) || isscalar(x));
@@ -79,8 +90,16 @@ if isempty(T)
     return;
 end
 
-% Pool counts across sessions
-G = varfun(@sum, T, 'InputVariables', {'NTrials','LeftRes','RightRes'}, ...
+% Pool counts across sessions. Choices are expressed relative to the side
+% rewarded for high frequencies (HighFreqSide: 'left' or 'right'; default right).
+if ismember('HighFreqSide', T.Properties.VariableNames)
+    highIsLeft = strcmpi(T.HighFreqSide, 'left');
+else
+    highIsLeft = false(height(T), 1);
+end
+T.HighRes = T.RightRes;
+T.HighRes(highIsLeft) = T.LeftRes(highIsLeft);
+G = varfun(@sum, T, 'InputVariables', {'NTrials','LeftRes','RightRes','HighRes'}, ...
     'GroupingVariables', {'AnimalID','VibFreq','VibAmp'});
 G.Properties.VariableNames = strrep(G.Properties.VariableNames, 'sum_', '');
 G.GroupCount = [];
@@ -94,7 +113,7 @@ else
     psychTable = G;
     psychTable.NResp = G.LeftRes + G.RightRes;
     psychTable.NTotal = psychTable.NResp;
-    psychTable.Successes = G.RightRes;
+    psychTable.Successes = G.HighRes;
 end
 psychTable = psychTable(psychTable.NTotal >= r.MinTrials & psychTable.NTotal > 0, :);
 [psychTable.Rate, psychTable.CILow, psychTable.CIHigh] = ...
@@ -111,7 +130,41 @@ if r.Plot
         panelBy = 'condition';
         if strcmp(type, 'frequency'), panelBy = 'animal'; end
     end
-    plotAll(psychTable, fitTable, animals, type, r.BoundaryFreq, panelBy);
+    if strcmp(type, 'frequency') && r.PoolAnimals
+        plotAnimalsOnePanel(psychTable, animals, r.BoundaryFreq);
+    else
+        plotAll(psychTable, fitTable, animals, type, r.BoundaryFreq, panelBy, logical(r.LinkAxes));
+    end
+end
+end
+
+function plotAnimalsOnePanel(P, animals, boundaryFreq)
+figure('Position', [100, 100, 600, 450]);
+ax = axes; hold(ax, 'on');
+cols = lines(max(numel(animals), 1));
+h = gobjects(0); names = {};
+for g = 1:numel(animals)
+    mA = strcmp(P.AnimalID, animals{g});
+    if ~any(mA), continue; end
+    fr = unique(P.VibFreq(mA));
+    rate = nan(size(fr));
+    for k = 1:numel(fr)
+        mF = mA & P.VibFreq == fr(k);
+        rate(k) = sum(P.Successes(mF)) / sum(P.NTotal(mF));
+    end
+    h(end+1) = plot(ax, fr, rate, 'o-', 'Color', cols(g, :), ...
+        'MarkerFaceColor', cols(g, :), 'MarkerSize', 6, 'LineWidth', 2); %#ok<AGROW>
+    names{end+1} = animals{g}; %#ok<AGROW>
+end
+yline(ax, 0.5, ':k', 'HandleVisibility', 'off');
+if ~isempty(boundaryFreq)
+    xline(ax, boundaryFreq, ':k', 'HandleVisibility', 'off');
+end
+xlabel(ax, 'Frequency (Hz)'); ylabel(ax, 'P(high-freq side | response)');
+ylim(ax, [0 1]); grid(ax, 'on');
+title(ax, 'Psychometric function: high-frequency-side rate vs frequency');
+if ~isempty(h)
+    legend(ax, h, names, 'Location', 'best', 'FontSize', 8);
 end
 end
 
@@ -188,7 +241,7 @@ else
 end
 end
 
-function plotAll(P, fitTable, animals, type, boundaryFreq, panelBy)
+function plotAll(P, fitTable, animals, type, boundaryFreq, panelBy, linkAxes)
 model = @(q, x) q(1) + (1 - q(1) - q(2)) * (1 - exp(-(x ./ q(4)).^q(3)));
 isAmp = strcmp(type, 'amplitude');
 if isAmp
@@ -209,9 +262,13 @@ nRows = ceil(nP / nCols);
 figure('Position', [100, 100, 350*nCols + 100, 300*nRows + 100]);
 animalColors = lines(max(numel(animals), 1));
 condColors = lines(max(numel(conds), 1));
+ptStyle = 'o-';
+if ~isAmp, ptStyle = 'o'; end
+axList = gobjects(0);
 
 for i = 1:nP
     ax = subplot(nRows, nCols, i); hold(ax, 'on');
+    axList(end+1) = ax; %#ok<AGROW>
     if strcmp(panelBy, 'animal')
         lineKeys = conds; panelTitle = sprintf('Animal: %s', animals{i});
     else
@@ -232,7 +289,7 @@ for i = 1:nP
         y = P.Rate(m); y = y(o);
         lo = P.CILow(m); lo = lo(o);
         hi = P.CIHigh(m); hi = hi(o);
-        h(end+1) = errorbar(ax, x, y, y - lo, hi - y, 'o-', 'Color', col, ...
+        h(end+1) = errorbar(ax, x, y, y - lo, hi - y, ptStyle, 'Color', col, ...
             'MarkerFaceColor', col, 'MarkerSize', 4, 'LineWidth', 1.2); %#ok<AGROW>
         names{end+1} = name; %#ok<AGROW>
         if isAmp && ~isempty(fitTable)
@@ -245,24 +302,51 @@ for i = 1:nP
         end
     end
     if ~isAmp
+        % Average rate per animal and frequency (pooled over amplitudes), connected
+        for g = 1:numel(animals)
+            if strcmp(panelBy, 'animal')
+                if g ~= i, continue; end
+                avgCol = 'k';
+            else
+                avgCol = animalColors(g, :);
+            end
+            mA = strcmp(P.AnimalID, animals{g});
+            if ~any(mA), continue; end
+            fr = unique(P.VibFreq(mA));
+            avgRate = nan(size(fr));
+            for k = 1:numel(fr)
+                mF = mA & P.VibFreq == fr(k);
+                avgRate(k) = sum(P.Successes(mF)) / sum(P.NTotal(mF));
+            end
+            plot(ax, fr, avgRate, 'o-', 'Color', avgCol, 'MarkerFaceColor', avgCol, ...
+                'MarkerSize', 6, 'LineWidth', 2.5, 'HandleVisibility', 'off');
+        end
         yline(ax, 0.5, ':k', 'HandleVisibility', 'off');
         if ~isempty(boundaryFreq)
             xline(ax, boundaryFreq, ':k', 'HandleVisibility', 'off');
         end
-        xlabel(ax, 'Frequency (Hz)'); ylabel(ax, 'P(right | response)');
+        xlabel(ax, 'Frequency (Hz)'); ylabel(ax, 'P(high-freq side | response)');
     else
         xlabel(ax, 'Amplitude'); ylabel(ax, 'Response rate');
     end
     ylim(ax, [0 1]); grid(ax, 'on');
     title(ax, panelTitle);
-    if ~isempty(h)
+    if isAmp && ~isempty(h)
         legend(ax, h, names, 'Location', 'best', 'FontSize', 8);
+    end
+end
+if ~isAmp && linkAxes && numel(axList) > 1
+    linkaxes(axList, 'x');
+    fr = unique(P.VibFreq);
+    if numel(fr) > 1
+        pad = 0.05 * (max(fr) - min(fr));
+        xlim(axList(1), [min(fr) - pad, max(fr) + pad]);
     end
 end
 if isAmp
     sgtitle('Psychometric function: response rate vs amplitude');
 else
-    sgtitle('Psychometric function: right-choice rate vs frequency');
+    sgtitle('Psychometric function: high-frequency-side rate vs frequency');
 end
 end
 
