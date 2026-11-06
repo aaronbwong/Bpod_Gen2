@@ -13,8 +13,10 @@ function [psychTable, fitTable] = plotPsychometricByAnimal(T, varargin)
 %                   frequencies, H/(L+R), vs frequency (using the per-session
 %                   HighFreqSide 'left'/'right' from SessionData.StimParams.Behave,
 %                   default right). Individual amplitudes are
-%                   shown as unconnected points with a thick connected
-%                   average per frequency on top; no legend; catch trials are excluded.
+%                   shown as unconnected points, colored by amplitude divided
+%                   by the maximum selected amplitude at that frequency
+%                   across animals. A thick connected average per frequency
+%                   is shown on top; catch trials are excluded.
 %   'Fit'           Weibull fit (binomial likelihood) for 'amplitude' type.
 %                   Default true. Ignored for 'frequency'.
 %   'BoundaryFreq'  Draw category boundary on 'frequency' plots. Default [].
@@ -32,6 +34,10 @@ function [psychTable, fitTable] = plotPsychometricByAnimal(T, varargin)
 %   'PoolAnimals'   'frequency' type: draw all animals on a single panel, one
 %                   connected line per animal (its rate per frequency, pooled
 %                   over amplitudes, with a legend). Default false.
+%   'ColorBy'       'frequency' type: color individual points by 'amplitude'
+%                   (default), relative to the selected maximum per frequency,
+%                   or 'responseRate', (LeftRes+RightRes)/NTrials. Ignored
+%                   for 'amplitude' type and when PoolAnimals is true.
 %   'SessionNumber','SessionDate','PeriodDays'  Session selection passed to
 %                   multi_session.selectSessionsByAnimal. Without any of
 %                   them all sessions are used.
@@ -51,6 +57,7 @@ addParameter(p, 'PanelBy', '', @(x) isempty(x) || any(strcmpi(x, {'condition','a
 addParameter(p, 'Plot', true, @(x) islogical(x) || isnumeric(x));
 addParameter(p, 'LinkAxes', true, @(x) islogical(x) || isnumeric(x));
 addParameter(p, 'PoolAnimals', false, @(x) islogical(x) || isnumeric(x));
+addParameter(p, 'ColorBy', 'amplitude', @(x) any(strcmpi(x, {'amplitude','responseRate'})));
 addParameter(p, 'SessionNumber', [], @(x) isempty(x) || isscalar(x));
 addParameter(p, 'SessionDate', [], @(x) isempty(x) || isdatetime(x) || ischar(x) || isstring(x));
 addParameter(p, 'PeriodDays', [], @(x) isempty(x) || isscalar(x));
@@ -143,7 +150,7 @@ if r.Plot
     if strcmp(type, 'frequency') && r.PoolAnimals
         plotAnimalsOnePanel(psychTable, animals, r.BoundaryFreq, dateLabel);
     else
-        plotAll(psychTable, fitTable, animals, type, r.BoundaryFreq, panelBy, logical(r.LinkAxes), dateLabel);
+        plotAll(psychTable, fitTable, animals, type, r.BoundaryFreq, panelBy, logical(r.LinkAxes), dateLabel, T, r.ColorBy);
     end
 end
 end
@@ -251,7 +258,7 @@ else
 end
 end
 
-function plotAll(P, fitTable, animals, type, boundaryFreq, panelBy, linkAxes, dateLabel)
+function plotAll(P, fitTable, animals, type, boundaryFreq, panelBy, linkAxes, dateLabel, T, colorBy)
 model = @(q, x) q(1) + (1 - q(1) - q(2)) * (1 - exp(-(x ./ q(4)).^q(3)));
 isAmp = strcmp(type, 'amplitude');
 if isAmp
@@ -269,11 +276,28 @@ else
 end
 nCols = min(max(ceil(sqrt(nP)), 1), 4);
 nRows = ceil(nP / nCols);
-figure('Position', [100, 100, 350*nCols + 100, 300*nRows + 100]);
 animalColors = lines(max(numel(animals), 1));
 condColors = lines(max(numel(conds), 1));
-ptStyle = 'o-';
-if ~isAmp, ptStyle = 'o'; end
+if ~isAmp
+    pointColors = flipud(parula(256));
+    if strcmpi(colorBy, 'responseRate')
+        colorValues = P.NResp ./ P.NTrials;
+        if any(~isfinite(colorValues) | colorValues < 0 | colorValues > 1)
+            error('multi_session:plotPsychometricByAnimal:InvalidResponseRate', ...
+                'Response rate coloring requires positive trial counts and response counts between zero and NTrials.');
+        end
+    else
+        colorValues = zeros(height(P), 1);
+        for f = unique(P.VibFreq(:))'
+            maxAmp = max(T.VibAmp(T.VibFreq == f));
+            if maxAmp > 0
+                mask = P.VibFreq == f;
+                colorValues(mask) = P.VibAmp(mask) / maxAmp;
+            end
+        end
+    end
+end
+figure('Position', [100, 100, 350*nCols + 100, 300*nRows + 100]);
 axList = gobjects(0);
 
 for i = 1:nP
@@ -299,9 +323,20 @@ for i = 1:nP
         y = P.Rate(m); y = y(o);
         lo = P.CILow(m); lo = lo(o);
         hi = P.CIHigh(m); hi = hi(o);
-        h(end+1) = errorbar(ax, x, y, y - lo, hi - y, ptStyle, 'Color', col, ...
-            'MarkerFaceColor', col, 'MarkerSize', 4, 'LineWidth', 1.2); %#ok<AGROW>
-        names{end+1} = name; %#ok<AGROW>
+        if isAmp
+            h(end+1) = errorbar(ax, x, y, y - lo, hi - y, 'o-', 'Color', col, ...
+                'MarkerFaceColor', col, 'MarkerSize', 4, 'LineWidth', 1.2); %#ok<AGROW>
+            names{end+1} = name; %#ok<AGROW>
+        else
+            values = colorValues(m);
+            values = values(o);
+            for k = 1:numel(x)
+                colorIndex = min(max(floor(values(k) * size(pointColors, 1)) + 1, 1), size(pointColors, 1));
+                col = pointColors(colorIndex, :);
+                errorbar(ax, x(k), y(k), y(k) - lo(k), hi(k) - y(k), 'o', ...
+                    'Color', col, 'MarkerFaceColor', col, 'MarkerSize', 4, 'LineWidth', 1.2);
+            end
+        end
         if isAmp && ~isempty(fitTable)
             fm = strcmp(fitTable.AnimalID, a) & fitTable.VibFreq == c;
             if any(fm)
@@ -357,5 +392,30 @@ if isAmp
     sgtitle(sprintf('Psychometric function: response rate vs amplitude%s', dateLabel));
 else
     sgtitle(sprintf('Psychometric function: high-frequency-side rate vs frequency%s', dateLabel));
+    drawnow;
+    for i = 1:numel(axList)
+        colormap(axList(i), pointColors);
+        clim(axList(i), [0 1]);
+    end
+    positions = zeros(numel(axList), 4);
+    for i = 1:numel(axList)
+        positions(i, :) = axList(i).Position;
+    end
+    cb = colorbar(axList(end));
+    for i = 1:numel(axList)
+        pos = positions(i, :);
+        pos(1) = pos(1) * 0.88;
+        pos(3) = pos(3) * 0.88;
+        axList(i).Position = pos;
+    end
+    cb.Position = [0.91, 0.15, 0.02, 0.7];
+    cb.Ticks = [0 1];
+    if strcmpi(colorBy, 'responseRate')
+        cb.TickLabels = {'0', '1'};
+        cb.Label.String = 'Response rate';
+    else
+        cb.TickLabels = {'0', 'max'};
+        cb.Label.String = 'Amplitude relative to frequency maximum';
+    end
 end
 end
