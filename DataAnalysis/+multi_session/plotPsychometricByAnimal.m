@@ -69,6 +69,16 @@ if ~isempty(r.SessionNumber) || ~isempty(r.SessionDate) || ~isempty(r.PeriodDays
     if ~isempty(r.PeriodDays),    args = [args, {'PeriodDays', r.PeriodDays}]; end
     T = multi_session.selectSessionsByAnimal(T, args{:});
 end
+dateLabel = '';
+if ismember('DateTime', T.Properties.VariableNames) && isdatetime(T.DateTime)
+    validDateTimes = T.DateTime(~isnat(T.DateTime));
+    if ~isempty(validDateTimes)
+        startTime = min(validDateTimes);
+        endTime = max(validDateTimes);
+        dateLabel = sprintf(' (%s to %s)', ...
+            string(startTime, 'yyyy-MM-dd'), string(endTime, 'yyyy-MM-dd'));
+    end
+end
 if ~isempty(r.Animals)
     keepAnimals = cellstr(r.Animals);
     missing = setdiff(keepAnimals, unique(T.AnimalID));
@@ -131,14 +141,14 @@ if r.Plot
         if strcmp(type, 'frequency'), panelBy = 'animal'; end
     end
     if strcmp(type, 'frequency') && r.PoolAnimals
-        plotAnimalsOnePanel(psychTable, animals, r.BoundaryFreq);
+        plotAnimalsOnePanel(psychTable, animals, r.BoundaryFreq, dateLabel);
     else
-        plotAll(psychTable, fitTable, animals, type, r.BoundaryFreq, panelBy, logical(r.LinkAxes));
+        plotAll(psychTable, fitTable, animals, type, r.BoundaryFreq, panelBy, logical(r.LinkAxes), dateLabel);
     end
 end
 end
 
-function plotAnimalsOnePanel(P, animals, boundaryFreq)
+function plotAnimalsOnePanel(P, animals, boundaryFreq, dateLabel)
 figure('Position', [100, 100, 600, 450]);
 ax = axes; hold(ax, 'on');
 cols = lines(max(numel(animals), 1));
@@ -162,10 +172,10 @@ if ~isempty(boundaryFreq)
 end
 xlabel(ax, 'Frequency (Hz)'); ylabel(ax, 'P(high-freq side | response)');
 ylim(ax, [0 1]); grid(ax, 'on');
-title(ax, 'Psychometric function: high-frequency-side rate vs frequency');
 if ~isempty(h)
     legend(ax, h, names, 'Location', 'best', 'FontSize', 8);
 end
+sgtitle(sprintf('Psychometric function: high-frequency-side rate vs frequency%s', dateLabel));
 end
 
 function P = buildAmplitudeTable(G)
@@ -241,7 +251,7 @@ else
 end
 end
 
-function plotAll(P, fitTable, animals, type, boundaryFreq, panelBy, linkAxes)
+function plotAll(P, fitTable, animals, type, boundaryFreq, panelBy, linkAxes, dateLabel)
 model = @(q, x) q(1) + (1 - q(1) - q(2)) * (1 - exp(-(x ./ q(4)).^q(3)));
 isAmp = strcmp(type, 'amplitude');
 if isAmp
@@ -344,9 +354,8 @@ if ~isAmp && linkAxes && numel(axList) > 1
     end
 end
 if isAmp
-    sgtitle('Psychometric function: response rate vs amplitude');
+    sgtitle(sprintf('Psychometric function: response rate vs amplitude%s', dateLabel));
 else
-    sgtitle('Psychometric function: high-frequency-side rate vs frequency');
+    sgtitle(sprintf('Psychometric function: high-frequency-side rate vs frequency%s', dateLabel));
 end
 end
-
