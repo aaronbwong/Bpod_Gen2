@@ -111,8 +111,13 @@ if ~isempty(boundaryFreqTable)
 end
 
 % Generate catch trial table (single row)
-% Use highFreqTable as template
-catchTrialTable = generateCatchTrialTable(highFreqTable);
+if ~isempty(highFreqTable)
+    % Use highFreqTable as template
+    catchTrialTable = generateCatchTrialTable(highFreqTable);
+else
+    % Use lowFreqTable as template
+    catchTrialTable = generateCatchTrialTable(lowFreqTable);
+end
 
 % Create output structure
 LeftRightSeq = struct();

@@ -4,6 +4,9 @@
 function Categorization()
     global BpodSystem
 
+    figurePosition = [20 -230 1200 800];
+    ParameterGUILocation = [840, 650];
+
     % Create trial manager object
     trialManager = BpodTrialManager;
 
@@ -24,48 +27,6 @@ function Categorization()
     % Generate complete randomized StimTable (includes CorrectSide and Rewarded columns)
     StimTable = GenStimSeq(StimParams);
 
-    % Add "Easy" trials if Trials are 200 Hz and 300 Hz（by replacing certain trials）
-    % find 200Hz trials and replace the 5th,10th... with [100Hz 0.55]
-    idx_200 = find(StimTable.VibFreq == 200);
-    if ~isempty(idx_200)
-        positions_to_replace_200 = 5:10:length(idx_200);
-        indices_to_replace_200 = idx_200(positions_to_replace_200);
-        StimTable.VibFreq(indices_to_replace_200) = 100;
-        StimTable.VibAmp(indices_to_replace_200) = 0.55;
-    end
-    % find 300Hz trials and replace the 5th,10th... with [400Hz 0.02]
-    idx_300 = find(StimTable.VibFreq == 300);
-    if ~isempty(idx_300)
-        positions_to_replace_300 = 5:10:length(idx_300);
-        indices_to_replace_300 = idx_300(positions_to_replace_300);
-        StimTable.VibFreq(indices_to_replace_300)=400;
-        StimTable.VibAmp(indices_to_replace_300)=0.02;
-    end
-    
-    % Find 100Hz@0.15 and 400Hz@0.0025 trials and replace with 200Hz@0.13 and 300Hz@0.04
-    idx_100_015 = find(StimTable.VibFreq == 100 & StimTable.VibAmp == 0.15);
-    if ~isempty(idx_100_015)
-        StimTable.VibFreq(idx_100_015) = 200;
-        StimTable.VibAmp(idx_100_015) = 0.13;
-    end
-    idx_400_00025 = find(StimTable.VibFreq == 400 & StimTable.VibAmp == 0.0025);
-    if ~isempty(idx_400_00025)
-        StimTable.VibFreq(idx_400_00025) = 300;
-        StimTable.VibAmp(idx_400_00025) = 0.04;
-    end
-
-    % Find 100Hz@0.25 and 400Hz@0.005 trials and replace with 200Hz@0.15 and 300Hz@0.05
-    idx_100_025 = find(StimTable.VibFreq == 100 & StimTable.VibAmp == 0.25);
-    if ~isempty(idx_100_025)
-        StimTable.VibFreq(idx_100_025) = 200;
-        StimTable.VibAmp(idx_100_025) = 0.15;
-    end
-    idx_400_0005 = find(StimTable.VibFreq == 400 & StimTable.VibAmp == 0.005);
-    if ~isempty(idx_400_0005)
-        StimTable.VibFreq(idx_400_0005) = 300;
-        StimTable.VibAmp(idx_400_0005) = 0.05;
-    end
-
     % Generate LeftRightSeq structure for data consistency (similar to AntiBias)
     LeftRightSeq = GenLeftRightSeq(StimParams);
 
@@ -82,16 +43,15 @@ function Categorization()
     S.GUI.MaxQuietTime = StimParams.Behave.MaxQuietTime; % seconds
     S.GUI.RewardAmount = StimParams.Behave.RewardAmount; % µL
     S.GUI.ResWin = StimParams.Behave.ResWin; % seconds
-
-    % Cut-off period for NoLick state
-    CutOffPeriod = 60; % seconds
+    S.GUI.CutOffPeriod = 60; % seconds
 
     % Initialize parameter GUI
     BpodParameterGUI('init', S);
+    BpodSystem.ProtocolFigures.ParameterGUI.Position(1:2) = ParameterGUILocation;
     % Create update button
     uicontrol('Style', 'pushbutton', ...
         'String', 'Update Parameters', ...
-        'Position', [160 240 150 30], ...  % [left bottom width height]
+        'Position', [250 260 150 30], ...  % [left bottom width height]
         'FontSize', 12, ...
         'Callback', @updateParams);
 
@@ -113,6 +73,7 @@ function Categorization()
     
     % Initialize data arrays
     BpodSystem.Data.CorrectSide = [];
+    BpodSystem.Data.IsCorrect = [];
     BpodSystem.Data.IsCatchTrial = [];
     BpodSystem.Data.ITIBefore = [];
     BpodSystem.Data.ITIAfter = [];
@@ -122,21 +83,21 @@ function Categorization()
     
     %% Initialize plots
     % Initialize the outcome plot with different trial types for left/right spouts
-    trialTypes = ones(1, NumTrials); % Will be updated based on correctSide (1=left, 2=right, 3=boundary)
-    outcomePlot = LiveOutcomePlot([1 2], {'Left Spout', 'Right Spout'}, trialTypes, NumTrials); % Create an instance of the LiveOutcomePlot GUI
-    % Arg1 = trialTypeManifest, a list of possible trial types (1=left, 2=right).
-    % Arg2 = trialTypeNames, a list of names for each trial type in trialTypeManifest
-    % Arg3 = trialTypes, a list of integers denoting precomputed trial types in the session
-    % Arg4 = nTrialsToShow, the number of trials to show
-    outcomePlot.RewardStateNames = {'LeftReward', 'RightReward'}; % List of state names where reward was delivered
-    outcomePlot.CorrectStateNames = {'LeftReward', 'RightReward'}; % States where correct response was made
+    % trialTypes = ones(1, NumTrials); % Will be updated based on correctSide (1=left, 2=right, 3=boundary)
+    % outcomePlot = LiveOutcomePlot([1 2], {'Left Spout', 'Right Spout'}, trialTypes, NumTrials); % Create an instance of the LiveOutcomePlot GUI
+    % % Arg1 = trialTypeManifest, a list of possible trial types (1=left, 2=right).
+    % % Arg2 = trialTypeNames, a list of names for each trial type in trialTypeManifest
+    % % Arg3 = trialTypes, a list of integers denoting precomputed trial types in the session
+    % % Arg4 = nTrialsToShow, the number of trials to show
+    % outcomePlot.RewardStateNames = {'LeftReward', 'RightReward'}; % List of state names where reward was delivered
+    % outcomePlot.CorrectStateNames = {'LeftReward', 'RightReward'}; % States where correct response was made
     
     %% Initialize custom figure with layout matching MainAn_v2 combined figure
     % Layout: 3 rows x 3 columns
     % Row 1: PlotLickIntervals, PlotResLatency, PlotLickRaster
     % Row 2: PlotSessionSummary, PlotCDFHitRate, PlotBarResponse
     % Row 3: PlotHitResponseRate (centered), empty, empty
-    customPlotFig = figure('Name', 'Behavior Analysis', 'Position', [100, 100, 1500, 800]);
+    customPlotFig = figure('Name', 'Behavior Analysis', 'Position', figurePosition);
     
     % Subplot 1: Session Summary (1,1) - left column, spans 2 rows
     summaryAx = subplot(3, 3, [1,4]);
@@ -208,6 +169,7 @@ function Categorization()
     BpodSystem.ProtocolFigures.CustomPlotFig = customPlotFig;
 
     % Prepare and start first trial
+    fprintf('=========== Trial %d ===========\n',1);
     [sma, S, updateFlag] = PrepareStateMachine(S, 1, updateFlag, StimTable, CalTable, H, Ramp);
     trialManager.startTrial(sma);
 
@@ -220,37 +182,62 @@ function Categorization()
             updateFlag = false; % reset flag
         end
         
-        % Wait for trigger states (LeftReward, RightReward, WaitToFinish)
-        trialManager.getCurrentEvents({'LeftReward', 'RightReward', 'WaitToFinish'});
-        if BpodSystem.Status.BeingUsed == 0; return; end % If user hit console "stop" button, end session
-        
-        % Get trial data
-        RawEvents = trialManager.getTrialData;
-        if BpodSystem.Status.BeingUsed == 0; return; end % If user hit console "stop" button, end session
-        
         % Save all trial parameters from S BEFORE preparing next trial
-        % For subsequent trials, S was set in previous iteration.
-        if ~isempty(fieldnames(RawEvents))
-            % Save all parameters from S (before S gets updated for next trial)
-            BpodSystem.Data.IsCatchTrial(currentTrial) = S.IsCatchTrial;
-            BpodSystem.Data.ITIBefore(currentTrial) = S.ITIBefore;
-            BpodSystem.Data.ITIAfter(currentTrial) = S.ITIAfter;
-            BpodSystem.Data.ThisITI(currentTrial) = S.ThisITI;
-            BpodSystem.Data.QuietTime(currentTrial) = S.QuietTime;
-            BpodSystem.Data.TimerDuration(currentTrial) = S.TimerDuration;
-            BpodSystem.Data.RewardAmount(currentTrial) = S.RewardAmount;
-            BpodSystem.Data.ResWin(currentTrial) = S.ResWin;
-            BpodSystem.Data.CutOff(currentTrial) = S.CutOff;
-            BpodSystem.Data.CorrectSide(currentTrial) = S.CorrectSide;
+        BpodSystem.Data.IsCatchTrial(currentTrial) = S.IsCatchTrial;
+        BpodSystem.Data.ITIBefore(currentTrial) = S.ITIBefore;
+        BpodSystem.Data.ITIAfter(currentTrial) = S.ITIAfter;
+        BpodSystem.Data.ThisITI(currentTrial) = S.ThisITI;
+        BpodSystem.Data.QuietTime(currentTrial) = S.QuietTime;
+        BpodSystem.Data.TimerDuration(currentTrial) = S.TimerDuration;
+        BpodSystem.Data.RewardAmount(currentTrial) = S.RewardAmount;
+        BpodSystem.Data.ResWin(currentTrial) = S.ResWin;
+        BpodSystem.Data.CutOff(currentTrial) = S.CutOff;
+        BpodSystem.Data.CorrectSide(currentTrial) = S.CorrectSide;
+        BpodSystem.Data.TrialSettings(currentTrial) = S;
+
+        % Add current trial's stimRow to StimTable (similar to AntiBias)
+        currentStimRow = StimTable(currentTrial, :);
+        if ~isempty(currentStimRow)
+            if height(BpodSystem.Data.StimTable) == 0
+                % First trial - create table
+                BpodSystem.Data.StimTable = currentStimRow;
+            else
+                % Append to existing table
+                BpodSystem.Data.StimTable = [BpodSystem.Data.StimTable; currentStimRow];
+            end
         end
-        
+
+        % % Wait for trigger states (LeftReward, RightReward, WaitToFinish)
+        currentTrialEvents = trialManager.getCurrentEvents({'LeftReward', 'RightReward', 'WaitToFinish'});
+        if BpodSystem.Status.BeingUsed == 0; return; end % If user hit console "stop" button, end session
+
+        % Check trial outcome from the captured events
+        isCorrect = false;
+        if BpodSystem.Data.IsCatchTrial(currentTrial)
+            isCorrect = true; % Catch trials are excluded from response scoring
+            disp(['Trial ' num2str(currentTrial) ': Catch trial - no response expected.']);
+        elseif ismember({'Condition6'}, currentTrialEvents.EventsCaptured)
+            disp(['Trial ' num2str(currentTrial) ': Manually rewarded']);
+        elseif any(ismember({'LeftReward', 'RightReward'}, currentTrialEvents.StatesVisited))
+            isCorrect = true;
+            disp(['Trial ' num2str(currentTrial) ': Correct response!']);
+        else
+            disp(['Trial ' num2str(currentTrial) ': Miss or incorrect response.']);
+        end
+        BpodSystem.Data.IsCorrect(currentTrial) = isCorrect;
+
         % Determine next side based on trial number (BEFORE preparing next trial's state machine)
-        if currentTrial < NumTrials
+        if currentTrial < NumTrials            
+            fprintf('=========== Trial %d ===========\n',currentTrial+1);
             % Prepare next trial's state machine
             [sma, S, updateFlag] = PrepareStateMachine(S, currentTrial+1, updateFlag, StimTable, CalTable, H, Ramp);
             
             SendStateMachine(sma, 'RunASAP'); % Send next trial's state machine during current trial
         end
+
+        % Get trial data
+        RawEvents = trialManager.getTrialData;
+        if BpodSystem.Status.BeingUsed == 0; return; end % If user hit console "stop" button, end session
         
         % Handle pause condition
         HandlePauseCondition;
@@ -263,38 +250,9 @@ function Categorization()
         % Process trial data if available
         if ~isempty(fieldnames(RawEvents))
             BpodSystem.Data = AddTrialEvents(BpodSystem.Data, RawEvents);
-            BpodSystem.Data.TrialSettings(currentTrial) = S;
             
             % Save trial timestamp
             BpodSystem.Data.TrialStartTimestamp(currentTrial) = RawEvents.TrialStartTimestamp;
-            
-            % Get current trial parameters directly from StimTable (already generated)
-            correctSide = StimTable.CorrectSide(currentTrial);
-            trialTypes(currentTrial) = correctSide; % 1 = left spout, 2 = right spout, 3 = boundary (both)
-            
-            % Add current trial's stimRow to StimTable (similar to AntiBias)
-            currentStimRow = StimTable(currentTrial, :);
-            if ~isempty(currentStimRow)
-                if height(BpodSystem.Data.StimTable) == 0
-                    % First trial - create table
-                    BpodSystem.Data.StimTable = currentStimRow;
-                else
-                    % Append to existing table
-                    BpodSystem.Data.StimTable = [BpodSystem.Data.StimTable; currentStimRow];
-                end
-            end
-            
-            % Extend trialTypes array to prevent index out of bounds in LiveOutcomePlot
-            % The plot window may extend beyond NumTrials, so we need extra elements
-            % Calculate maximum possible index: currentTrial + nTrialsToShow - 1
-            maxPossibleIndex = currentTrial + outcomePlot.nTrialsToShow - 1;
-            if length(trialTypes) < maxPossibleIndex
-                % Extend array with default value (1 = left spout) for future trials
-                trialTypes(end+1:maxPossibleIndex) = 1;
-            end
-            
-            % Update outcome plot
-            outcomePlot.update(trialTypes, BpodSystem.Data);
             
             % Update all plots with layout matching MainAn_v2 combined figure
             try
@@ -333,13 +291,17 @@ function Categorization()
         soundWave = GenStimWave(currentStimRow, CalTable);
         soundWave = ApplySinRamp(soundWave, Ramp, H.SamplingRate);
         
-        % Display trial info
-        disp(currentStimRow);
+        % Display trial info with configuration
+        for k = 1:2
+            fprintf('%s: %g\t', currentStimRow.Properties.VariableNames{k}, currentStimRow{1,k});
+        end
+        fprintf('\n');
         
         % Load the sound wave into BpodHiFi
-        H.load(1, soundWave);
+        % Alternate between two HiFi buffers so loading the next trial never overwrites a sound still playing
+        playSlot = 1 + mod(currentTrial - 1, 2);
+        H.load(playSlot, soundWave);
         H.push();
-        disp(['Trial ' num2str(currentTrial) ': Sound loaded to buffer 1']);
 
         % Generate random ITI and quiet time for this trial
         ITIBefore = S.GUI.MinITI/2;
@@ -349,7 +311,7 @@ function Categorization()
         TimerDuration = ITIAfter + StimDur; % GlobalTimer2 covers stimulus + ITI after
         RewardAmount = S.GUI.RewardAmount;
         ResWin = S.GUI.ResWin;
-        CutOff = CutOffPeriod;
+        CutOff = S.GUI.CutOffPeriod;
 
         % Get valve times
         ValveTimes = BpodLiquidCalibration('GetValveTimes', RewardAmount, [1 2]);
@@ -452,7 +414,7 @@ function Categorization()
             sma = AddState(sma, 'Name', 'Stimulus', ...
                 'Timer', ResWin, ... % "Response window"
                 'StateChangeConditions', {'Tup', 'WaitToFinish'}, ...
-                'OutputActions', {'HiFi1', ['P' 0],'GlobalTimerTrig', 2});
+                                'OutputActions', {'HiFi1', ['P' playSlot-1],'GlobalTimerTrig', 2});
         else
             % Regular trial - stimulus plays until correct lick
             if strcmp(correctResponse, 'left')
@@ -460,19 +422,19 @@ function Categorization()
                 sma = AddState(sma, 'Name', 'Stimulus', ...
                     'Timer', ResWin, ... % Response window
                     'StateChangeConditions', {'BNC1High', 'LeftReward', 'BNC2High', 'WaitToFinish', 'Tup', 'WaitToFinish','Condition6', 'LeftReward'}, ...
-                    'OutputActions', {'HiFi1', ['P' 0],'GlobalTimerTrig', 2});
+                                        'OutputActions', {'HiFi1', ['P' playSlot-1],'GlobalTimerTrig', 2});
             elseif strcmp(correctResponse, 'right')
                 % Right is correct - only respond to right lick (BNC2High)
                 sma = AddState(sma, 'Name', 'Stimulus', ...
                     'Timer', ResWin, ... 
                     'StateChangeConditions', {'BNC1High', 'WaitToFinish', 'BNC2High', 'RightReward', 'Tup', 'WaitToFinish','Condition6', 'RightReward'}, ...
-                    'OutputActions', {'HiFi1', ['P' 0],'GlobalTimerTrig', 2});
+                                        'OutputActions', {'HiFi1', ['P' playSlot-1],'GlobalTimerTrig', 2});
             elseif strcmp(correctResponse, 'boundary')
                 % Boundary frequency - both sides are correct
                 sma = AddState(sma, 'Name', 'Stimulus', ...
                     'Timer', ResWin, ... 
                     'StateChangeConditions', {'BNC1High', 'LeftReward', 'BNC2High', 'RightReward', 'Tup', 'WaitToFinish'}, ...
-                    'OutputActions', {'HiFi1', ['P' 0],'GlobalTimerTrig', 2});
+                                        'OutputActions', {'HiFi1', ['P' playSlot-1],'GlobalTimerTrig', 2});
             end
         end
         
