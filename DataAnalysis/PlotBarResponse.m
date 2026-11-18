@@ -326,8 +326,9 @@ function PlotBarResponse(SessionData, varargin)
     ylim(ax, [0 1]);
     
     % Add legend
-    legend(ax, {'Left', 'Right'}, 'Location', 'northeast');
-    
+    lgd = legend(ax, {'Left', 'Right'}, 'Location', 'rightoutside');
+    lgd.Box = 'off'; lgd.Color = 'none';
+
     % Add grid
     grid(ax, 'on');
     
