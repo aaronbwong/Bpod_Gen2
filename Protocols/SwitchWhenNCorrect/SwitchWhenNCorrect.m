@@ -245,6 +245,7 @@ function SwitchWhenNCorrect()
                 disp(['Trial ' num2str(currentTrial) ': Manually rewarded']);
             elseif any(ismember({'LeftReward','RightReward'},currentTrialEvents.StatesVisited))
                 isCorrect = true;
+                correctCount = correctCount + 1;
                 disp(['Trial ' num2str(currentTrial) ': Correct response!']);
             else
                 disp(['Trial ' num2str(currentTrial) ': Miss or incorrect response.']);
