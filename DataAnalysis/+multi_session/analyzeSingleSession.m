@@ -157,6 +157,17 @@ sessionTable.AnimalID = repmat({animalID}, nCombos, 1);
 sessionTable.Protocol = repmat({protocol}, nCombos, 1);
 sessionTable.Time = repmat({datetimeStr}, nCombos, 1);
 sessionTable.Session_nTrials = repmat(nTrials, nCombos, 1);
+% Spout rewarded for high frequencies ('left' or 'right'); default right
+highFreqSide = 'right';
+if isfield(SessionData, 'StimParams') && isfield(SessionData.StimParams, 'Behave')
+    behave = SessionData.StimParams.Behave;
+    if isfield(behave, 'CorrectSpoutName')
+        highFreqSide = lower(char(behave.CorrectSpoutName));
+    elseif isfield(behave, 'CorrectSpout')
+        highFreqSide = ternarySide(behave.CorrectSpout);
+    end
+end
+sessionTable.HighFreqSide = repmat({highFreqSide}, nCombos, 1);
 % sessionTable.ResWin = repmat(sessionMetaTable.ResWin, nCombos, 1);
 
 sessionMetaTable.FileName = {filename};
@@ -171,4 +182,9 @@ sessionTable.DateTime = datetime(sessionTable.Time, ...
     'InputFormat', 'yyyyMMdd_HHmmss');
 sessionMetaTable.DateTime = datetime(sessionMetaTable.Time, ...
     'InputFormat', 'yyyyMMdd_HHmmss');
+end
+
+function s = ternarySide(code)
+% Convert CorrectSpout code (1 = left, 2 = right) to text
+if code == 1, s = 'left'; else, s = 'right'; end
 end
